@@ -14,7 +14,7 @@ const RAD = Math.PI / 180;
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }; // 서울시청
 // 핀 머리(위)·이름표(아래)가 잘리지 않고 범례(아래, 강이 있으면 위)와 겹치지 않도록 투영할 안쪽 여백
 const INSET = { left: 30, right: 30, top: 50, bottom: 56 };
-const INSET_RIVER = { left: 30, right: 30, top: 84, bottom: 30 };
+const INSET_RIVER = { left: 30, right: 30, top: 96, bottom: 30 };
 
 const LANDMARK_NEAR_M = 900;
 
@@ -272,7 +272,7 @@ export function renderMap(el, { center = null, places = [], me = null, selectedI
   html += pins.map((q) => '<button type="button" class="pin ' + (q.p.kind === 'food' ? 'food' : 'tour') + (q.p.id === selectedId ? ' on' : '') + (q.hideLbl ? ' nolbl' : '')
     + '" data-id="' + esc(q.p.id) + '" style="' + pct(q) + '" aria-label="' + esc(q.p.title) + '">'
     + '<span class="head"><span>' + placeEmoji(q.p) + '</span></span><span class="lbl">' + esc(q.p.title) + '</span></button>').join('');
-  html += '<div class="legend' + (river ? ' top' : '') + '">🧡 맛집 · 🩷 관광지 · 🔵 내 위치' + (walk ? ' · ⋯ 걸어서' : '') + '</div>';
+  html += '<div class="legend' + (river ? ' up' : '') + '">🧡 맛집 · 🩷 관광지 · 🔵 내 위치' + (walk ? ' · ⋯ 걸어서' : '') + '</div>';
 
   el.innerHTML = html;
   el.querySelectorAll('.pin').forEach((b) => {
