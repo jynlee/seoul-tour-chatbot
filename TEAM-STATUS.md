@@ -29,8 +29,8 @@
 | B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ⬜ |
 | B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ⬜ |
 | F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ✅ 팀원2 |
-| F2 | 일러스트 지도 모듈 | 팀원2 | F1 | 🔄 팀원2 |
-| F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ⬜ |
+| F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ✅ 팀원2 |
+| F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | 🔄 팀원2 (가짜 응답으로 화면 먼저) |
 | F4 | GPS 위치 | 팀원2 | F3 | ⬜ |
 | Q1 | API 테스트 스위트 | 팀원3 | **B6** | ⬜ |
 | Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | ⬜ |
@@ -63,6 +63,9 @@
 - 결정: 계획과 달리 DOM에 의존하지 않는 모듈은 따로 뺌 — `home.js`(renderHome), F3의 `view.js`(cardHtml·chipLabel), F4의 `geo.js`(requestLocation). app.js는 import 시 DOM을 건드려서 node 테스트에서 import 불가하기 때문.
 - 결정: 크기는 결과 시안(폰 폭 300px) → 393px 기준 약 1.3배로 맞춤. 첫 화면 칩 3개(📍 내 주변 맛집·🏯 종로 관광지·☕ 성수 카페)가 한 줄에 들어가게 12.5px.
 - API 계약: 팀원1과 2026-10-23 합의(④). 핀 이모지는 category 키워드로 고름(카페/전통찻집→☕, food→🍽️, 역사→🏯, 자연·휴양·공원→🌳, 쇼핑→🛍️, 문화→🏛️, 축제·행사·공연→🎉, 레포츠→🏃, 기본 📍).
+- F2 완료: `static/js/map.js`(computeBounds·project·mulberry32·seedFor·riverVisible·renderMap), `emoji.js`(placeEmoji), `util.js`(esc), `tests/js/map.test.mjs` 11개 통과.
+- 결정(지도): 기준점 900m 안의 6대 랜드마크는 범위에 포함해서 미니 일러스트가 보이게 함(광화문→경복궁). 한강 물빛은 S2a처럼 **짧은 직선**만(시안 결과 화면의 q 곡선은 '흰 곡선' 안티목표와 헷갈려서 뺌). 이름표끼리 겹치면 순위 낮은 장소 이름표만 숨김(핀은 그대로). 핀은 물방울 끝이 좌표에 오도록 배치. 선택 핀이 있으면 내 위치(없으면 기준점)에서 점선 '걸어서' 경로.
+- **함정: Node 24에서 `node --test tests/js`(디렉터리)는 MODULE_NOT_FOUND로 실패** → `node --test "tests/js/*.test.mjs"`로 실행해야 함(완료 조건 명령도 이걸로).
 - 함정: Windows에서 헤드리스 Chrome `--window-size=393,…`은 최소 폭(약 500px) 때문에 실제로는 393이 안 됨 → 393×852 iframe을 감싼 페이지를 찍어서 비교함.
 
 ### 팀원3 qa
