@@ -22,12 +22,12 @@
 | ID | 내용 | 담당 | 선행 | 상태 |
 |---|---|---|---|---|
 | T0 | 뼈대·설정·API 계약 초안·이 문서 | 리드 | — | ✅ |
-| B1 | 카탈로그 + 전화번호 보강 | 팀원1 | T0 | 🔄 팀원1 (코드 ✅, 보강 실행 중) |
+| B1 | 카탈로그 + 전화번호 보강 | 팀원1 | T0 | ✅ 팀원1 |
 | B2 | 거리·지역 이름표·기준점 결정 | 팀원1 | T0 | ✅ 팀원1 |
 | B3 | seoul-tour-v2 인덱스 + kNN 후보 검색 | 팀원1 | B1 | ✅ 팀원1 |
 | B4 | chat_message 대화 기록 저장소 | 팀원1 | T0 | ✅ 팀원1 |
 | B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ✅ 팀원1 |
-| B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | 🔄 팀원1 |
+| B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ✅ 팀원1 |
 | F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ⬜ |
 | F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ⬜ |
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ⬜ |
@@ -46,6 +46,12 @@
   - 일상 대화 응답은 `places: []`, `center: null` (지도 유지).
   - `/api/history`: `created_at`은 ISO 문자열(`2026-10-23T14:05:00`), 오래된 순, 없는 세션은 `messages: []`. user 메시지는 `center:null, places:[]`.
   - 오류: 422(FastAPI 기본 검증 형식), 503 `{"detail":"검색 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."}`.
+- 2026-10-23 B6 완료(팀원1) — 실제 동작 기준 보충:
+  - 실행: `uvicorn app.main:create_app --factory --port 8000` (worktree 루트에 `.env` 필요, 시작에 임베딩 모델 로딩 ~10초). `static/`이 있으면 `/`에 마운트(`index.html`).
+  - `/api/health` 실측 `{"opensearch":true,"ollama":true,"mysql":true}`. 채팅 한 턴 약 2~7초(Ollama). 첫 Ollama 호출은 모델 로딩으로 +13초 가능 → 프론트 fetch 타임아웃은 넉넉히(60초 이상).
+  - LLM 실패 시 answer = `template_answer` 문구. 단, 반경 안 장소가 없어 가까운 곳으로 대체한 경우에만 뒤에 ` (가장 가까운 곳은 2.3km 떨어진 ○○예요)`가 붙음.
+  - `tel`은 관광공사 원문 그대로라 `"광화문 관광안내소 02-735-8688"`, `"강남구청 02-3423-6000~3 …"`처럼 설명이 섞일 수 있음(457/574건 있음).
+  - 기준점 없는 검색(예: "이번 주 축제")은 `center:null`, `distance_m/walk_min:null`.
 
 ## ⑤ 결정 사항 로그
 - 2026-10-23 리드: 이 환경(Claude Code 2.1.309)에는 공유 태스크 리스트 전용 도구가 없어서 **이 문서 ③ 표를 공유 태스크 리스트로 쓴다**. 팀원은 백그라운드 에이전트로 뜨고, 서로 agentId로 `SendMessage` 한다(아래 ⑦ 명단).
@@ -73,6 +79,9 @@
 - 결정(B5): ① 축제·행사·공연 키워드**만** 있으면 types=`{"15"}`만("이번 주 축제"에 음식점이 섞이지 않게), 다른 키워드와 같이 있으면 15 추가. ② 카페 cat3 필터는 카페 키워드만 있을 때("카페랑 맛집"은 음식점 전체). ③ 반경 1500m 안이 1~2곳이면 같은 조건의 가장 가까운 곳으로 **3곳까지 채움**(거리·도보는 실제값; 음식점이 100곳뿐이라 자주 생김). 0곳이면 계획대로 가장 가까운 3곳 + fallback_note.
 - B5: Ollama 호출에 `"think": false` 넣음(gemma4 생각 출력 방지). 실호출 약 4초, 첫 호출은 모델 로딩 ~13초. 타임아웃 30초 → `LLMUnavailable` → 템플릿 답변.
 - 테스트: `tests/__init__.py` 추가(패키지) → 테스트에서 `from tests.conftest import FakeSearcher` 가능. conftest에 `small_catalog`, `FakeEmbedder`, `FakeSearcher(catalog, scores, fail)`, `FakeLLM(answer, fail)`.
+- B1 완료: 전화번호 보강 574/574 처리, **457건 번호 있음**(117건은 API에도 없음 → "전화번호 정보 없음"). 인덱스도 보강 후 재색인함. 주의: 요청 URL에 API 키가 들어가므로 오류 로그에서 키를 가리도록 고침.
+- B6 완료: `app/chat.py`(ChatService, Deps), `app/main.py`(create_app, 503 처리, health, static 마운트, 시작 시 30일 지난 기록 삭제). 대화 기록 저장/조회가 실패해도 채팅은 계속(로그만 남김). 실서버 시나리오 확인: 광화문 맛집→5곳, "거기 근처 카페"(개성만두 궁 선택)→감꽃당 등 카페 3곳, "고마워!"→places [], "성수 카페"→area, "종로 관광지"→gu 종로구, GPS→"현재 위치".
+- B5 보충: 프롬프트에 "날짜·영업시간·가격 등 없는 정보 말하지 말 것" 규칙 추가(축제 질문에 "이번 주에 열리는"이라고 지어낸 사례 있었음).
 - 알려진 한계: 2글자 장소명(`기후`, `길목`, `기와` 등)이 일반 단어로 질문에 들어가면 그 장소가 기준점이 됨(드묾, 그대로 둠).
 
 ### 팀원2 frontend
@@ -83,3 +92,4 @@
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
+- 팀원1: B1~B6 완료(`feat/backend`). 남은 일은 팀원3(Q1·Q2) 버그 리포트 대응. Q1은 `tests/conftest.py`의 `small_catalog`·`FakeEmbedder`·`FakeSearcher`·`FakeLLM`과 `InMemoryHistoryRepo`로 `create_app(Deps(...))`를 만들면 됨(예: `tests/test_chat_service.py`).
