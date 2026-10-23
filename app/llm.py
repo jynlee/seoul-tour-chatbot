@@ -3,7 +3,7 @@ from typing import Protocol
 
 from app.schemas import PlaceOut
 
-HISTORY_LIMIT = 6
+HISTORY_LIMIT = 8  # 약 4턴 (사용자+챗봇)
 
 
 class LLMUnavailable(RuntimeError):
@@ -27,12 +27,13 @@ def _place_line(i: int, p: PlaceOut) -> str:
 
 
 def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
-                 center_label: str | None, fallback_note: str | None) -> str:
+                 center_label: str | None, fallback_note: str | None, more: bool = False) -> str:
     history = "\n".join(history_texts[-HISTORY_LIMIT:]) or "(없음)"
     place_text = "\n".join(_place_line(i, p) for i, p in enumerate(places, 1)) or "(없음)"
     rules = [
         "반드시 한국어로, 2문장 이내로만 답변할 것",
         "아래 [추천 장소]에 있는 장소만 언급하고, 목록에 없는 장소를 지어내지 말 것",
+        "[이전 대화]에 나온 장소는 이번 답변에서 다시 추천하지 말 것. [이전 대화]는 흐름을 이어 가는 데만 쓸 것",
         "추천 장소가 없으면 \"조건에 맞는 장소를 찾지 못했어요.\"라고만 답할 것",
         "친근한 말투로, 장소 목록은 지도에 표시된다는 점을 고려해 핵심만 말할 것",
         "날짜·기간·영업시간·가격·메뉴처럼 [추천 장소]에 없는 정보는 말하지 말 것",
@@ -43,6 +44,8 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
     else:
         rules.append("기준점이 없으므로 '근처'·'주변'이라는 말이나 특정 동네·지역 이름을 쓰지 말 것")
         rules.append("답변 끝에 현재 위치(📍)를 켜거나 지역 이름을 말해 주면 더 가까운 곳을 찾아 준다고 안내할 것")
+    if more:
+        rules.append("사용자가 다른 곳을 원했다. [추천 장소]는 이전에 보여 준 곳을 뺀 새 장소들이라는 점을 자연스럽게 말할 것")
     if fallback_note:
         rules.append(f"기준점 반경 안에 장소가 없어서 가까운 곳을 골랐다. 다음 문장을 반드시 언급할 것: \"{fallback_note}\"")
     rules_text = "\n".join(f"{i}. {r}" for i, r in enumerate(rules, 1))
@@ -65,6 +68,83 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
 {message}
 
 [답변] (2문장 이내로)"""
+
+
+CLARIFY_ANSWER = "어느 곳을 말씀하시는지 알려주세요. 장소 이름을 말하거나 지도에서 핀을 눌러 주시면 알려드릴게요."
+NO_MORE_ANSWER = "{label} 조건으로 더 보여드릴 곳이 없어요. 다른 지역이나 종류로 물어봐 주세요."
+
+
+def _labels():
+    from app.dialog import FIELD_LABELS
+
+    return FIELD_LABELS
+
+
+def _place_facts(place) -> list[str]:
+    labels = _labels()
+    facts = [f"이름: {place.title}", f"분류: {place.category}", f"주소: {place.addr}",
+             f"전화: {place.tel or '정보 없음'}"]
+    for key, value in place.detail.items():
+        if value:
+            facts.append(f"{labels.get(key, key)}: {value}")
+    return facts
+
+
+def build_info_prompt(message: str, history_texts: list[str], place, fields: list[str]) -> str:
+    """장소 하나에 대한 정보 질문(주차·영업시간·어디야 등). 근거는 이 장소의 기본 정보와 detail 뿐."""
+    labels = _labels()
+    history = "\n".join(history_texts[-HISTORY_LIMIT:]) or "(없음)"
+    facts = "\n".join(f"- {f}" for f in _place_facts(place))
+    asked = ", ".join(labels.get(f, f) for f in fields) or "(장소 소개)"
+    tel_rule = f"전화({place.tel})로 확인해 보라고 덧붙일 것" if place.tel else "확인할 전화번호도 없다고 말할 것"
+    rules = [
+        "반드시 한국어로, 1~2문장으로만 답변할 것",
+        f"[장소 정보]에 있는 내용만 근거로 '{place.title}'에 대해 답할 것. 다른 장소를 추천하거나 지어내지 말 것",
+        f"물어본 항목이 [장소 정보]에 없으면 지어내지 말고 '○○ 정보는 없어요'라고 말한 뒤 {tel_rule}",
+        "이전 대화는 말투와 흐름을 맞추는 데만 쓰고, 사실 근거로 쓰지 말 것",
+    ]
+    rules_text = "\n".join(f"{i}. {r}" for i, r in enumerate(rules, 1))
+    return f"""너는 서울 관광 안내 챗봇 "서울 여행 친구"야. 반드시 한국어로만 답변해.
+
+규칙:
+{rules_text}
+
+[이전 대화]
+{history}
+
+[장소 정보]
+{facts}
+
+[물어본 항목]
+{asked}
+
+[현재 질문]
+{message}
+
+[답변] (1~2문장으로)"""
+
+
+def info_template_answer(place, fields: list[str]) -> str:
+    """LLM 없이 detail 값을 그대로 쓴 답변 (Ollama 다운, 또는 물어본 정보가 하나도 없을 때)."""
+    from app.dialog import info_value
+
+    labels = _labels()
+    if not fields:
+        answer = f"{place.title}: {place.category}, 주소 {place.addr}"
+        answer += f", 전화 {place.tel}." if place.tel else "."
+        return answer
+    parts, missing = [], False
+    for f in fields:
+        value = info_value(place, f)
+        if value:
+            parts.append(f"{labels.get(f, f)}: {value}")
+        else:
+            parts.append(f"{labels.get(f, f)} 정보는 없어요")
+            missing = True
+    answer = f"{place.title} — " + " / ".join(parts) + "."
+    if missing and place.tel:
+        answer += f" 전화({place.tel})로 확인해 보세요."
+    return answer
 
 
 def template_answer(places: list[PlaceOut], center_label: str | None) -> str:

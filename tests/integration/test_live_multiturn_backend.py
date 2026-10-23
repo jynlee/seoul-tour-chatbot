@@ -1,0 +1,58 @@
+"""실서비스 멀티턴 통합 테스트 (OpenSearch·Ollama·MySQL 켜진 상태). pytest -m integration"""
+import uuid
+
+import pytest
+
+pytestmark = pytest.mark.integration
+
+CAFE = "A05020900"
+
+
+@pytest.fixture(scope="module")
+def live():
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    app = create_app()
+    client = TestClient(app)
+    sessions = []
+    yield client, app.state.deps, sessions
+    for sid in sessions:
+        app.state.deps.history.delete_session(sid)
+
+
+def test_live_multiturn_myeongdong(live):
+    client, deps, sessions = live
+    sid = f"test-live-mt-{uuid.uuid4().hex[:12]}"
+    sessions.append(sid)
+
+    def say(message, **extra):
+        r = client.post("/api/chat", json={"session_id": sid, "message": message, **extra}, timeout=120)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    r1 = say("명동 맛집 추천해줘")
+    assert r1["center"]["label"] == "명동" and r1["places"]
+    assert all(p["kind"] == "food" for p in r1["places"])
+
+    r2 = say("카페는?")
+    assert r2["center"]["label"] == "명동"
+    assert r2["places"] and all(deps.catalog[p["id"]].cat3 == CAFE for p in r2["places"])
+
+    r3 = say("다른 데 더 추천해줘")
+    if r3["places"]:
+        assert r3["center"]["label"] == "명동"
+        assert all(deps.catalog[p["id"]].cat3 == CAFE for p in r3["places"])
+        assert not {p["id"] for p in r3["places"]} & {p["id"] for p in r2["places"]}
+        target = r3["places"][1] if len(r3["places"]) > 1 else r3["places"][0]
+        r4 = say("두 번째 거기 어디야?" if len(r3["places"]) > 1 else "첫 번째 거기 어디야?")
+        assert r4["places"] == [] and r4["center"] is None
+        assert r4["answer"]
+        # 핀 유지: 마지막 추천은 r3 그대로
+        assert [p.id for p in deps.history.last_assistant(sid).places] == [p["id"] for p in r3["places"]]
+        assert target["id"] in deps.catalog
+
+    # 모든 장소는 카탈로그에 있어야 함 (지어낸 장소 없음)
+    for r in (r1, r2, r3):
+        assert all(p["id"] in deps.catalog for p in r["places"])
