@@ -28,6 +28,25 @@ def test_build_prompt_without_note():
     assert "km 떨어진" not in prompt
 
 
+def test_build_prompt_no_center_forbids_nearby():
+    # QA-2: 기준점이 없으면 "근처·주변"이라고 하지 말고 위치·지역을 알려 달라고 안내
+    prompt = build_prompt("내 주변 맛집", [], [_place("A")], None, None)
+    assert "근처" in prompt and "주변" in prompt and "쓰지 말 것" in prompt
+    assert "지역" in prompt
+
+
+def test_build_prompt_center_label_and_far_mark():
+    # QA-2: 기준점 이름은 [기준점] 값만, 반경 밖으로 채운 곳은 '조금 멂' 표시
+    far = _place("먼카페", 35)  # 35*67 = 2345m
+    prompt = build_prompt("거기 근처 카페 있어?", ["챗봇: 광화문 근처 맛집이에요"], [_place("가까운카페", 6), far],
+                          "광화문국밥", None)
+    assert "'광화문국밥'" in prompt
+    assert "조금 멂" in prompt
+    lines = prompt.splitlines()
+    assert "조금 멂" in next(l for l in lines if "먼카페" in l)
+    assert "조금 멂" not in next(l for l in lines if "가까운카페" in l)
+
+
 def test_template_answer():
     places = [_place("A"), _place("B"), _place("C")]
     assert template_answer(places, "광화문") == "광화문 근처 추천 장소를 지도에 표시했어요: A, B, C"
