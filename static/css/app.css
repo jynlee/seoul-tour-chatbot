@@ -111,7 +111,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   position: absolute; left: 10px; bottom: 10px; background: #fffd; padding: 3px 10px;
   border-radius: 10px; font-size: 12px; color: var(--brown); z-index: 4;
 }
-.legend.top { bottom: auto; top: 10px; }
+.legend.up { bottom: auto; top: 10px; } /* .top은 상단 바 클래스와 겹쳐서 쓰지 않음 */
 
 /* ---------- 결과 화면 (시안 result-screen.html / result-folded-b.html) ---------- */
 .result { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -176,7 +176,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .fold .mini i { position: absolute; width: 9px; height: 9px; border-radius: 50%; transform: translate(-50%, -50%); }
 .fold .sum { min-width: 0; display: flex; white-space: nowrap; }
 .fold .sum b { overflow: hidden; text-overflow: ellipsis; }
-.fold .sum span { flex-shrink: 0; }
+.fold .sum span { flex-shrink: 0; margin-left: .3em; }
 .fold .open { margin-left: auto; color: #ff6b8a; font-weight: 700; font-size: 14px; white-space: nowrap; }
 .chips {
   display: flex; gap: 8px; overflow-x: auto; padding: 10px 13px 2px; flex-shrink: 0;

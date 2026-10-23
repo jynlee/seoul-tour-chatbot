@@ -26,6 +26,11 @@ test('네트워크 오류면 연결 안내 문구', async () => {
   await assert.rejects(sendChat({ message: 'x' }, async () => { throw new TypeError('Failed to fetch'); }), /서버에 연결할 수 없어요/);
 });
 
+test('시간이 너무 오래 걸리면 중단하고 안내 문구', async () => {
+  const hang = (_u, opt) => new Promise((_r, rej) => opt.signal.addEventListener('abort', () => rej(new Error('aborted'))));
+  await assert.rejects(sendChat({ message: 'x' }, hang, 30), /너무 오래 걸려요/);
+});
+
 test('history 조회', async () => {
   let url;
   const res = await fetchHistory('a b', async (u) => { url = u; return { ok: true, status: 200, json: async () => ({ messages: [] }) }; });

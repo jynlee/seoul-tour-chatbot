@@ -30,8 +30,8 @@
 | B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ✅ 팀원1 |
 | F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ✅ 팀원2 |
 | F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ✅ 팀원2 |
-| F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | 🔄 팀원2 (B6 연동 확인 중) |
-| F4 | GPS 위치 | 팀원2 | F3 | ⬜ |
+| F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ✅ 팀원2 |
+| F4 | GPS 위치 | 팀원2 | F3 | ✅ 팀원2 |
 | Q1 | API 테스트 스위트 | 팀원3 | **B6** | ⬜ |
 | Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | ⬜ |
 
@@ -97,6 +97,11 @@
 - F3 화면(가짜 API로 확인): `api.js`(sendChat·fetchHistory, 실패 시 한국어 Error), `view.js`(cardHtml·chipLabel·bubbleHtml·foldBarHtml·placeChipsHtml), `app.js` 상태·이벤트. 테스트 26개 통과. **미완성: 실제 백엔드(B6) 연동 확인 전.**
 - 결정(F3): 카드 ✕로 닫아도 `selectedId`는 남겨서 다음 요청 `selected_place_id`로 보냄(새 추천이 오면 초기화). 걷는 점선은 내 위치(GPS)가 있을 때만(기준점엔 표시가 없어 선이 허공에서 시작해 보여서). 첫 추천 전에는 지도 자리를 숨기고 대화만 보임. 새로고침 복원 실패 시 첫 화면 유지.
 - 확인 도구(저장소 밖): 가짜 API 서버 `scratchpad/mock_server.py <static경로> 8002`와 iframe 하네스 `/__h/harness.html#reset;send:…;click:…`로 클릭 시나리오 스크린샷.
+- F4 완료(1af1537): `geo.js` requestLocation(미지원/거부/실패 문구, 8초), 📍 누르면 `pendingLocation` + 입력창 "📍 현재 위치 사용 중"·버튼 강조, 다시 누르면 취소, 다음 전송에 한 번 실어 보내고 비움. "📍 내 주변 맛집" 칩은 위치 요청 후 전송(실패해도 오류 말풍선 후 location null로 전송).
+- 첫 화면 수정(f3b86e0, 사용자 요청): 🍜 핀 삭제, 포인터를 따라다니는 🎒(`follower.js`, 첫 화면에서만, 결과 화면 가면 해제).
+- **F3·F4 실제 연동 확인 완료**(feat/backend 병합 a8c27d1, uvicorn 8000): 광화문 맛집 5곳 핀 → 개성만두 궁 카드 → "거기 근처 카페 있어?" 핀 교체(카페 3곳) → 접기·칩→카드 → "고마워!" 지도 유지 → 새로고침 복원(성수 카페) → GPS(가짜 geo 좌표 주입)로 내 위치 파란 점·걸어서 점선 → OPENSEARCH_PORT=9299로 띄운 서버에서 503 오류 말풍선. 스크린샷 `scratchpad/shots/real-*.png`.
+- 연동 중 고친 것: 채팅 fetch 90초 타임아웃(첫 Ollama 호출이 느림, "답변이 너무 오래 걸려요" 문구), 강 있을 때 범례 클래스 `.top`이 상단 바 `.top` CSS와 겹쳐 글자가 커지던 버그 → `.up`으로 변경, 요약 바 "근처 · 추천" 띄어쓰기.
+- 미확인: Chrome 개발자도구 Sensors로 실제 위치 권한 허용/차단 수동 확인은 못 함(헤드리스에서 navigator.geolocation을 가짜로 바꿔 확인). Q2에서 확인 부탁.
 - **함정: Node 24에서 `node --test tests/js`(디렉터리)는 MODULE_NOT_FOUND로 실패** → `node --test "tests/js/*.test.mjs"`로 실행해야 함(완료 조건 명령도 이걸로).
 - 함정: Windows에서 헤드리스 Chrome `--window-size=393,…`은 최소 폭(약 500px) 때문에 실제로는 393이 안 됨 → 393×852 iframe을 감싼 페이지를 찍어서 비교함.
 
