@@ -30,9 +30,10 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
         "2. 아래 [추천 장소]에 있는 장소만 언급하고, 목록에 없는 장소를 지어내지 말 것",
         "3. 추천 장소가 없으면 \"조건에 맞는 장소를 찾지 못했어요.\"라고만 답할 것",
         "4. 친근한 말투로, 장소 목록은 지도에 표시된다는 점을 고려해 핵심만 말할 것",
+        "5. 날짜·기간·영업시간·가격·메뉴처럼 [추천 장소]에 없는 정보는 말하지 말 것",
     ]
     if fallback_note:
-        rules.append(f"5. 기준점 반경 안에 장소가 없어서 가까운 곳을 골랐다. 다음 문장을 반드시 언급할 것: \"{fallback_note}\"")
+        rules.append(f"6.기준점 반경 안에 장소가 없어서 가까운 곳을 골랐다. 다음 문장을 반드시 언급할 것: \"{fallback_note}\"")
     rules_text = "\n".join(rules)
     center_text = center_label or "(기준점 없음)"
     return f"""너는 서울 관광 안내 챗봇 "서울 여행 친구"야. 반드시 한국어로만 답변해.
