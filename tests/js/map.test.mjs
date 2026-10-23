@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeBounds, project, mulberry32, seedFor, riverVisible } from '../../static/js/map.js';
+import { computeBounds, project, mulberry32, seedFor, riverVisible, spreadPins, pinBox } from '../../static/js/map.js';
 import { placeEmoji } from '../../static/js/emoji.js';
 
 const W = 400, H = 350;
@@ -87,6 +87,19 @@ test('시드는 기준점 좌표로 정해진다', () => {
 test('한강은 범위가 위도 37.505~37.545에 걸칠 때만', () => {
   assert.equal(riverVisible(computeBounds(PTS)), false);
   assert.equal(riverVisible(computeBounds([{ lat: 37.5198, lng: 126.9402 }])), true); // 63빌딩
+});
+
+test('겹치는 핀은 서로 밀어내서 겹치지 않게 된다', () => {
+  const items = [
+    { x: 120, y: 200, lw: 90 },
+    { x: 105, y: 222, lw: 120 },
+    { x: 300, y: 120, lw: 80 },
+  ];
+  const out = spreadPins(items);
+  const ov = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  assert.equal(ov(pinBox(out[0]), pinBox(out[1])), false);
+  assert.deepEqual(out[2], items[2]); // 안 겹친 핀은 그대로
+  for (const q of out) assert.ok(q.x >= 0 && q.x <= W && q.y >= 0 && q.y <= H);
 });
 
 test('핀 이모지', () => {

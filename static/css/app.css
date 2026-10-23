@@ -100,9 +100,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .pin.food .head { background: var(--orange); }
 .me {
   position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #4f8cff;
-  border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(79, 140, 255, .2); transform: translate(-50%, -50%);
+  border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(79, 140, 255, .2); transform: translate(-50%, -50%); z-index: 2;
 }
 .legend {
   position: absolute; left: 10px; bottom: 10px; background: #fffd; padding: 3px 10px;
   border-radius: 10px; font-size: 12px; color: var(--brown); z-index: 4;
 }
+.legend.top { bottom: auto; top: 10px; }
