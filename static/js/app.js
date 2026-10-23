@@ -4,6 +4,7 @@ import { renderHome } from './home.js';
 import { renderMap } from './map.js';
 import { cardHtml, bubbleHtml, foldBarHtml, placeChipsHtml } from './view.js';
 import { sendChat, fetchHistory } from './api.js';
+import { requestLocation } from './geo.js';
 
 const SESSION_KEY = 'stc.sessionId';
 const $ = (sel) => document.querySelector(sel);
@@ -117,7 +118,7 @@ function addBubble(role, text) {
   return chat.lastElementChild;
 }
 
-export function botNotice(text) {
+function botNotice(text) {
   showResult();
   addBubble('assistant', text);
 }
@@ -154,9 +155,51 @@ async function send(message) {
   }
 }
 
-// ---------- 위치 (F4에서 채움) ----------
+// ---------- 위치 (📍 버튼 / "📍 내 주변 맛집" 칩) ----------
+const PLACEHOLDER = '메시지 입력…';
+const PLACEHOLDER_GPS = '📍 현재 위치 사용 중';
+
+function setPendingLocation(loc) {
+  state.pendingLocation = loc;
+  $('#gps').classList.toggle('on', !!loc);
+  $('#gps').setAttribute('aria-pressed', loc ? 'true' : 'false');
+  $('#msg').placeholder = loc ? PLACEHOLDER_GPS : PLACEHOLDER;
+}
+
 function clearPendingLocation() {
-  state.pendingLocation = null;
+  setPendingLocation(null);
+}
+
+// 위치를 받아 pendingLocation에 둔다. 실패하면 봇 말풍선으로 알리고 null.
+async function locate() {
+  const btn = $('#gps');
+  btn.classList.add('wait');
+  btn.disabled = true;
+  try {
+    const res = await requestLocation();
+    if (res.error) {
+      clearPendingLocation();
+      botNotice(res.error);
+      return null;
+    }
+    setPendingLocation(res);
+    return res;
+  } finally {
+    btn.classList.remove('wait');
+    btn.disabled = false;
+  }
+}
+
+async function onGpsButton() {
+  if (state.pendingLocation) { clearPendingLocation(); return; } // 한 번 더 누르면 취소
+  await locate();
+  $('#msg').focus();
+}
+
+async function onChip(chip) {
+  if (state.busy) return;
+  if (chip.gps) await locate(); // 실패해도 location: null로 전송
+  send(chip.message);
 }
 
 // ---------- 새로고침 복원 ----------
@@ -181,9 +224,8 @@ async function restore() {
 
 // ---------- 시작 ----------
 buildResult();
-renderHome($('#home'), {
-  onChip: (chip) => send(chip.message),
-});
+renderHome($('#home'), { onChip });
+$('#gps').addEventListener('click', onGpsButton);
 $('#inp').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = $('#msg').value;
