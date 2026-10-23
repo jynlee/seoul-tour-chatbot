@@ -33,7 +33,7 @@
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ✅ 팀원2 |
 | F4 | GPS 위치 | 팀원2 | F3 | ✅ 팀원2 |
 | Q1 | API 테스트 스위트 | 팀원3 | **B6** | ✅ 팀원3 |
-| Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | 🔄 팀원3 |
+| Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | ✅ 팀원3 |
 
 ## ④ 합의된 인터페이스
 **초안 (T0, 리드):** `app/schemas.py` — `ChatRequest{session_id?, message(1~500자, 앞뒤 공백 제거), location?{lat,lng}, selected_place_id?}` → `ChatResponse{session_id, answer, center?{lat,lng,label,source: gps|place|area|gu|history}, places[PlaceOut{id,title,kind: food|tour,category,addr,tel,lat,lng,image,distance_m?,walk_min?}]}` / `GET /api/history/{session_id}` → `{session_id, messages[{role,message,center?,places,created_at}]}` / `GET /api/health` → `{opensearch,ollama,mysql: bool}` / 503 `detail`: "검색 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."
@@ -115,8 +115,11 @@
 - Q1 완료: `tests/api/`(가짜 의존성 56건: 계약·422·세션·멀티턴 "거기 근처"·places 교체·Review Focus 1~5·잘못된 좌표·지어낸 장소·기록 저장소 장애·history·health) + `tests/integration/test_live_api.py`(실서비스 8건, `test-qa-` 세션만 쓰고 끝나면 삭제). `pytest -m "not integration"` 129 통과, `pytest -m integration` 8 통과.
 - 버그 QA-1(팀원1, 850364d로 수정·재확인 완료): session_id 64자 초과 시 200인데 MySQL 저장이 조용히 실패 → 이제 65자 이상은 422.
 - 함정: Git Bash에서 `curl -d '{"message":"한글"}'`은 인코딩이 깨져 400 "There was an error parsing the body"가 남(서버 문제 아님) → 파이썬 requests나 UTF-8 파일 `--data-binary @파일`로 보낼 것. 포트 8001은 다른 프로세스(정적 http 서버)가 쓰는 중 → QA 서버는 8011. 8000은 사용자용 서버(끄지 말 것).
+- Q2 완료: `docs/manual-qa.md` 24개 항목 모두 통과(헤드리스 Chrome iPhone 14 Pro 393x852, 실서비스). 자동 점검 스크립트 `scripts/qa_mobile/run.mjs`(CDP, Node 24 내장 WebSocket): 8011 정상 / 8012 `OPENSEARCH_PORT=9299`(503) / 8013 `OLLAMA_URL=http://localhost:11999`(템플릿). `tests/integration/test_live_chat.py` 3건 추가. 스크린샷: `C:\Users\SMT03\AppData\Local\Temp\claude\C--Users-SMT03-SeoulTourChatbot\796dbd34-6ee3-48fe-b2a5-1247492df3b8\scratchpad\shots\01~14-*.png`.
+- 버그 QA-2(팀원1, bed8ebc): 기준점 없을 때 "근처/주변"·지어낸 동네 이름, 기준점 대신 이전 지역명 → 프롬프트 보강, 재확인 통과(LLM 문구라 완전 보장은 아님). QA-3(팀원2, ea2ea88): 넓은 범위 지도에서 랜드마크끼리·핀과 겹침 → 겹치는 랜드마크 생략, 재확인 통과.
+- 함정: 점검용 화면에서 만든 대화 기록은 UUID 세션이라 `test-qa-` 접두가 아님 → `results.json`의 `sessions`를 `delete_session()`으로 지움(완료).
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
 - 팀원1: B1~B6 완료(`feat/backend`). 남은 일은 팀원3(Q1·Q2) 버그 리포트 대응. Q1은 `tests/conftest.py`의 `small_catalog`·`FakeEmbedder`·`FakeSearcher`·`FakeLLM`과 `InMemoryHistoryRepo`로 `create_app(Deps(...))`를 만들면 됨(예: `tests/test_chat_service.py`).
-- 팀원3: Q1 완료(`feat/qa`). Q2 진행 중(feat/frontend 2c0f870 기준, 포트 8011, `docs/manual-qa.md`·`tests/integration/test_live_chat.py`).
+- 팀원3: Q1·Q2 완료(`feat/qa`, backend bed8ebc + frontend ea2ea88 병합 상태에서 확인). 남은 일 없음. 리드 병합 후 실제 휴대폰 위치 권한 팝업만 사람이 한 번 확인 권장.
