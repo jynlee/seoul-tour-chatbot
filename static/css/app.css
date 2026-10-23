@@ -100,7 +100,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .pin.food .head { background: var(--orange); }
 .me {
   position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #4f8cff;
-  border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(79, 140, 255, .2); transform: translate(-50%, -50%); z-index: 2;
+  border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(79, 140, 255, .2); transform: translate(-50%, -50%); z-index: 0;
 }
 .legend {
   position: absolute; left: 10px; bottom: 10px; background: #fffd; padding: 3px 10px;
@@ -187,3 +187,5 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .chip[aria-pressed="true"] { background: #fff7f9; }
 .chip.food[aria-pressed="true"] { border-color: var(--orange); }
 .chip.tour[aria-pressed="true"] { border-color: var(--pink); }
+.inp .gps.wait { opacity: .5; animation: blink 1s infinite ease-in-out; }
+.inp .gps:disabled { cursor: default; }
