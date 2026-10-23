@@ -1,0 +1,227 @@
+<h2>S2a 수정본</h2>
+<p class="subtitle">돛단배를 지웠습니다. 한강에는 잔잔한 물빛 선만 남았어요.</p>
+
+<style>
+  .wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:22px;justify-items:center}
+  .phone{width:250px;height:520px;border:8px solid #222;border-radius:28px;overflow:hidden;position:relative;color:#333;font-size:11.5px;display:flex;flex-direction:column;background:linear-gradient(#ffe9f0,#fff6e8)}
+  .phone svg{display:block;width:100%}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;padding:0 12px}
+  .chip{font-size:10px;padding:4px 9px;border-radius:999px;background:#fff;border:1.5px solid #ffc2cf;box-shadow:0 1px 0 #ffc2cf}
+  .inp{margin:auto 10px 10px;display:flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:7px 11px;box-shadow:0 2px 6px rgba(0,0,0,.12);color:#aaa}
+  .inp .gps{margin-left:auto}
+  .hello{padding:4px 14px 8px;line-height:1.45}
+  .hello b{font-size:14.5px;display:block;margin-bottom:1px}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  .bob{animation:bob 1.8s ease-in-out infinite}
+  .card-body h3{margin-bottom:2px}
+</style>
+
+<div class="cards wrap" id="cards"></div>
+
+<script>
+(function(){
+  function defs(s){return '<defs>'
+    +'<linearGradient id="gold'+s+'" x1="0" x2="1"><stop offset="0" stop-color="#f3c262"/><stop offset=".55" stop-color="#fbe3a6"/><stop offset="1" stop-color="#e9ad48"/></linearGradient>'
+    +'<linearGradient id="silver'+s+'" x1="0" x2="1"><stop offset="0" stop-color="#b9c8dc"/><stop offset=".5" stop-color="#eef3fa"/><stop offset="1" stop-color="#a5b6cd"/></linearGradient>'
+    +'<linearGradient id="roof'+s+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b6b78"/><stop offset="1" stop-color="#3f4b56"/></linearGradient>'
+    +'<radialGradient id="hill'+s+'" cx=".5" cy=".3"><stop offset="0" stop-color="#cfe8b8"/><stop offset="1" stop-color="#a7d48f"/></radialGradient>'
+    +'<linearGradient id="sky'+s+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe3ec"/><stop offset="1" stop-color="#fff3e2"/></linearGradient>'
+    +'<linearGradient id="ddp'+s+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f7fb"/><stop offset="1" stop-color="#bfcbdb"/></linearGradient>'
+    +'<linearGradient id="river'+s+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe6f8"/><stop offset="1" stop-color="#93cfee"/></linearGradient>'
+    +'</defs>';}
+  function palace(x,y,k,s){return '<g transform="translate('+x+','+y+') scale('+k+')">'
+    +'<rect x="-44" y="18" width="88" height="7" rx="1.5" fill="#e4ddd0"/><rect x="-38" y="12" width="76" height="7" rx="1.5" fill="#efe9de"/>'
+    +'<rect x="-6" y="12" width="12" height="13" fill="#d9d1c2"/><rect x="-32" y="-6" width="64" height="18" fill="#f6ead2"/>'
+    +[-28,-17,-6,5,16,27].map(function(px){return '<rect x="'+px+'" y="-6" width="3" height="18" fill="#c8483b"/>'}).join('')
+    +'<rect x="-32" y="-9" width="64" height="4" fill="#5fae96"/><rect x="-32" y="-9" width="64" height="1.3" fill="#e9655a"/>'
+    +'<path d="M-48,-11 Q-40,-9 -30,-12 L30,-12 Q40,-9 48,-11 Q42,-17 34,-21 L-34,-21 Q-42,-17 -48,-11Z" fill="url(#roof'+s+')"/>'
+    +'<rect x="-22" y="-30" width="44" height="10" fill="#f6ead2"/>'
+    +[-19,-8,3,14].map(function(px){return '<rect x="'+px+'" y="-30" width="2.5" height="10" fill="#c8483b"/>'}).join('')
+    +'<rect x="-22" y="-32" width="44" height="3" fill="#5fae96"/>'
+    +'<path d="M-36,-32 Q-29,-30 -21,-33 L21,-33 Q29,-30 36,-32 Q30,-40 22,-44 L-22,-44 Q-30,-40 -36,-32Z" fill="url(#roof'+s+')"/>'
+    +'<path d="M-23,-44 L23,-44" stroke="#2f3a43" stroke-width="2.4" stroke-linecap="round"/>'
+    +'</g>';}
+  function gate(x,y,k,s){var st='';for(var r=0;r<3;r++)for(var c=0;c<7;c++)st+='<rect x="'+(-35+c*10+(r%2?5:0))+'" y="'+(4+r*6)+'" width="9" height="5" rx="1" fill="#e6dfd3"/>';
+    return '<g transform="translate('+x+','+y+') scale('+k+')">'
+    +'<rect x="-36" y="2" width="72" height="22" rx="2" fill="#d6cdbd"/>'+st
+    +'<path d="M-8,24 L-8,14 A8,8 0 0 1 8,14 L8,24Z" fill="#6b5847"/>'
+    +'<rect x="-26" y="-10" width="52" height="12" fill="#f6ead2"/>'
+    +[-23,-12,-1,10,21].map(function(px){return '<rect x="'+px+'" y="-10" width="2.5" height="12" fill="#c8483b"/>'}).join('')
+    +'<rect x="-26" y="-12" width="52" height="3" fill="#5fae96"/>'
+    +'<path d="M-38,-12 Q-30,-10 -24,-13 L24,-13 Q30,-10 38,-12 Q32,-19 25,-22 L-25,-22 Q-32,-19 -38,-12Z" fill="url(#roof'+s+')"/>'
+    +'<rect x="-18" y="-29" width="36" height="8" fill="#f6ead2"/><rect x="-18" y="-31" width="36" height="2.5" fill="#5fae96"/>'
+    +'<path d="M-28,-31 Q-22,-29 -17,-32 L17,-32 Q22,-29 28,-31 Q23,-37 17,-40 L-17,-40 Q-23,-37 -28,-31Z" fill="url(#roof'+s+')"/>'
+    +'</g>';}
+  function namsan(x,y,k,s){return '<g transform="translate('+x+','+y+') scale('+k+')">'
+    +'<path d="M-46,22 C-30,-2 -12,-8 0,-8 C14,-8 30,-2 46,22Z" fill="url(#hill'+s+')"/>'
+    +'<circle cx="-24" cy="12" r="5" fill="#8cc271"/><circle cx="-14" cy="6" r="6" fill="#8cc271"/><circle cx="18" cy="8" r="5.5" fill="#8cc271"/><circle cx="28" cy="14" r="4.5" fill="#8cc271"/>'
+    +'<path d="M-7,-6 L-4,-14 L4,-14 L7,-6Z" fill="#f2efe9"/>'
+    +'<rect x="-2.6" y="-60" width="5.2" height="47" fill="#fbfaf7" stroke="#d8d2c6" stroke-width=".8"/>'
+    +'<ellipse cx="0" cy="-60" rx="11" ry="3" fill="#e9e4dc"/>'
+    +'<rect x="-10" y="-70" width="20" height="10" rx="3" fill="#fff" stroke="#d8d2c6" stroke-width=".8"/><rect x="-10" y="-67" width="20" height="2.4" fill="#ffb3c1"/>'
+    +'<rect x="-8.5" y="-77" width="17" height="7" rx="2.5" fill="#fff" stroke="#d8d2c6" stroke-width=".8"/><rect x="-8.5" y="-75" width="17" height="2" fill="#9fd1ec"/>'
+    +'<rect x="-1.4" y="-104" width="2.8" height="27" fill="#fff"/>'
+    +[0,1,2,3].map(function(i){return '<rect x="-1.4" y="'+(-104+i*7)+'" width="2.8" height="3.5" fill="#ff7a8f"/>'}).join('')
+    +'</g>';}
+  function ddp(x,y,k,s){var d='';for(var i=0;i<9;i++)d+='<path d="M'+(-30+i*7.5)+',-2 Q'+(-28+i*7.5)+',-12 '+(-26+i*7.5)+',-16" stroke="#a9b8cc" stroke-width=".8" fill="none"/>';
+    return '<g transform="translate('+x+','+y+') scale('+k+')"><ellipse cx="0" cy="6" rx="42" ry="6" fill="#d7ecc4"/>'
+    +'<path d="M-40,4 C-42,-10 -30,-22 -8,-22 C10,-22 18,-14 30,-16 C42,-18 44,-4 40,4Z" fill="url(#ddp'+s+')" stroke="#a9b8cc" stroke-width="1"/>'+d
+    +'<path d="M-24,-20 C-12,-26 4,-24 14,-18" stroke="#9fd083" stroke-width="4" fill="none" stroke-linecap="round"/></g>';}
+  function b63(x,y,k,s){var r='';for(var i=0;i<12;i++)r+='<path d="M'+(-11+i*0.25)+','+(-4-i*5.6)+' L'+(11-i*0.25)+','+(-4-i*5.6)+'" stroke="#e2a443" stroke-width=".7" opacity=".7"/>';
+    return '<g transform="translate('+x+','+y+') scale('+k+')"><ellipse cx="0" cy="2" rx="20" ry="4" fill="#cfe8b8"/>'
+    +'<path d="M-12,0 L-8.5,-68 Q0,-74 8.5,-68 L12,0Z" fill="url(#gold'+s+')"/>'+r
+    +'<path d="M-3,-66 L-1,-4" stroke="#fff" stroke-width="2" opacity=".55"/><rect x="-14" y="-4" width="28" height="5" rx="1" fill="#e6c48a"/></g>';}
+  function lotte(x,y,k,s){return '<g transform="translate('+x+','+y+') scale('+k+')"><ellipse cx="0" cy="2" rx="18" ry="4" fill="#cfe8b8"/>'
+    +'<path d="M-9,0 C-8,-40 -4,-80 -1.5,-104 L-.3,-96 L.3,-96 L1.5,-104 C4,-80 8,-40 9,0Z" fill="url(#silver'+s+')"/>'
+    +'<path d="M0,-94 L0,0" stroke="#fff" stroke-width="1.4" opacity=".6"/><rect x="-12" y="-2" width="24" height="4" rx="1" fill="#c9d6e8"/></g>';}
+  function tree(x,y,r){return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="#9fd083"/>';}
+  function pin(x,y,e,c){return '<g class="bob"><circle cx="'+x+'" cy="'+y+'" r="9" fill="'+(c||'#ff9f43')+'" stroke="#fff" stroke-width="2.5"/><text x="'+(x-5.5)+'" y="'+(y+4)+'" font-size="10">'+e+'</text></g>';}
+  function cloud(x,y){return '<g fill="#fff" opacity=".9"><ellipse cx="'+x+'" cy="'+y+'" rx="18" ry="6"/><ellipse cx="'+(x+11)+'" cy="'+(y-5)+'" rx="10" ry="6"/></g>';}
+
+  // 1) 지리 배치 수정본
+  function v1(s){return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +'<path d="M0,0 L300,0 L300,30 C250,55 200,40 160,58 C120,75 60,70 0,62Z" fill="#cfe8b8" opacity=".9"/>'
+    +tree(24,30,11)+tree(48,22,13)+tree(74,34,10)+tree(120,28,11)+tree(150,20,9)+tree(250,18,10)+tree(272,26,8)
+    +cloud(205,92)
+    +'<path d="M0,262 C60,244 110,280 160,264 C210,248 250,276 300,258 L300,298 C250,316 210,288 160,304 C110,320 60,284 0,302Z" fill="url(#river'+s+')"/>'
+    +'<path d="M30,280 q8,-5 16,0 M140,288 q8,-5 16,0 M250,280 q8,-5 16,0" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+    +'<path d="M0,326 C80,314 200,336 300,320 L300,420 L0,420Z" fill="#d7ecc4" opacity=".7"/>'
+    +palace(62,120,.72,s)+ddp(240,160,.85,s)+gate(105,206,.72,s)+namsan(200,232,.92,s)
+    +b63(75,392,1.0,s)+lotte(232,398,.98,s)
+    +pin(160,128,'🍜')+'</svg>';}
+
+  // 2) 스카이라인 파노라마: 랜드마크를 강변 따라 한 줄로
+  function v2(s){return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +'<rect y="300" width="300" height="120" fill="url(#river'+s+')"/><g transform="translate(0,70)">'
+    +'<circle cx="235" cy="70" r="26" fill="#ffd3b0" opacity=".8"/>'
+    +cloud(60,55)+cloud(160,40)
+    +'<path d="M0,170 C40,130 80,150 110,140 C150,125 180,160 220,150 C260,140 280,155 300,150 L300,240 L0,240Z" fill="#d7ecc4"/>'
+    +'<path d="M0,190 C50,170 90,185 140,178 C200,170 250,190 300,180 L300,240 L0,240Z" fill="#c4e3ac"/>'
+    +palace(40,214,.55,s)+gate(98,220,.5,s)+namsan(150,222,.7,s)+ddp(205,224,.55,s)+b63(240,230,.75,s)+lotte(275,232,.8,s)
+    +'<path d="M0,232 C80,226 200,240 300,230 L300,330 L0,330Z" fill="url(#river'+s+')"/>'
+    +'<path d="M30,262 q8,-5 16,0 M120,282 q8,-5 16,0 M210,258 q8,-5 16,0 M70,305 q8,-5 16,0 M240,300 q8,-5 16,0" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+    +'<g opacity=".35"><path d="M150,240 L150,280" stroke="#fff" stroke-width="3"/><path d="M240,240 L240,270" stroke="#fff" stroke-width="2.5"/></g>'
+    +pin(120,120,'🍜')+pin(255,110,'☕','#ff8fa3')+'</g></svg>';}
+
+  // 3) 동그란 섬 지도
+  function v3(s){return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +cloud(40,40)+cloud(240,395)
+    +'<ellipse cx="150" cy="215" rx="140" ry="180" fill="#e2f1d4"/><ellipse cx="150" cy="215" rx="140" ry="180" fill="none" stroke="#fff" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round"/>'
+    +'<path d="M12,232 C60,212 110,252 160,235 C210,218 250,247 288,229 L288,264 C250,281 210,253 160,271 C110,287 60,249 12,267Z" fill="url(#river'+s+')"/>'
+    +tree(110,58,10)+tree(132,50,12)+tree(156,56,9)
+    +palace(88,122,.68,s)+ddp(226,150,.72,s)+gate(118,190,.6,s)+namsan(196,212,.8,s)
+    +b63(92,358,.95,s)+lotte(206,362,.92,s)
+    +pin(165,112,'🍜')+'</svg>';}
+
+  // 4) 스탬프 스티커: 랜드마크를 동그란 배지로, 점선 산책로로 연결
+  function badge(x,y,r,inner,col){return '<g><circle cx="'+x+'" cy="'+(y+3)+'" r="'+r+'" fill="#000" opacity=".08"/><circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="#fff"/><circle cx="'+x+'" cy="'+y+'" r="'+(r-4)+'" fill="'+col+'"/><circle cx="'+x+'" cy="'+y+'" r="'+(r-1.5)+'" fill="none" stroke="'+col+'" stroke-width="1" stroke-dasharray="2 3"/>'+inner+'</g>';}
+  function v4(s){return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +'<path d="M0,242 C60,222 110,258 160,242 C210,226 250,254 300,236 L300,276 C250,294 210,266 160,282 C110,298 60,262 0,280Z" fill="url(#river'+s+')"/>'
+    +'<path d="M70,80 C130,95 120,150 92,175 M92,175 C140,200 170,190 205,170 M205,170 C240,140 250,110 228,82 M205,170 C220,240 110,280 80,345 M80,345 C140,380 190,380 228,345" stroke="#e3a6b4" stroke-width="2.4" fill="none" stroke-dasharray="1 7" stroke-linecap="round"/>'
+    +badge(70,80,42,palace(70,87,.58,s),'#fff3d9')
+    +badge(228,82,38,ddp(228,86,.68,s),'#e9f1fb')
+    +badge(92,175,36,gate(92,180,.6,s),'#fbe9e1')
+    +badge(205,170,42,namsan(205,192,.48,s),'#e6f4da')
+    +badge(80,345,42,b63(80,370,.7,s),'#fff3d9')
+    +badge(228,345,42,lotte(228,374,.6,s),'#e9f1fb')
+    +pin(150,120,'🍜')+'</svg>';}
+
+
+  function row(s,y){return palace(40,y-16,.55,s)+gate(98,y-10,.5,s)+namsan(150,y-8,.7,s)+ddp(205,y-6,.55,s)+b63(240,y,.75,s)+lotte(275,y+2,.8,s);}
+  // P1) 파노라마 · 북한산 능선: 뒤로 겹겹 산 능선 + 새
+  function p1(s){return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +'<circle cx="70" cy="110" r="22" fill="#ffd3b0" opacity=".85"/>'+cloud(200,60)+cloud(250,110)
+    +'<path d="M150,90 q5,-5 10,0 q5,-5 10,0 M190,80 q4,-4 8,0 q4,-4 8,0" stroke="#c98a9a" stroke-width="1.6" fill="none" stroke-linecap="round"/>'
+    +'<path d="M0,200 L40,150 L70,175 L110,128 L150,170 L190,140 L230,168 L265,135 L300,165 L300,300 L0,300Z" fill="#d9ecf2" opacity=".9"/>'
+    +'<path d="M0,225 C40,190 80,215 120,198 C160,182 200,215 240,200 C270,190 290,205 300,200 L300,300 L0,300Z" fill="#d7ecc4"/>'
+    +'<path d="M0,255 C50,238 90,250 140,246 C200,240 250,256 300,248 L300,310 L0,310Z" fill="#c4e3ac"/>'
+    +row(s,300)
+    +'<path d="M0,302 C80,296 200,310 300,300 L300,420 L0,420Z" fill="url(#river'+s+')"/>'
+    +'<path d="M30,332 q8,-5 16,0 M120,352 q8,-5 16,0 M210,328 q8,-5 16,0 M70,385 q8,-5 16,0 M240,378 q8,-5 16,0" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+    +pin(120,180,'🍜')+'</svg>';}
+  // P2) 파노라마 · 노을 반영: 노을빛 하늘 + 강물에 비친 실루엣
+  function p2(s){return '<svg viewBox="0 0 300 420">'+defs(s)
+    +'<linearGradient id="sun'+s+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd9e4"/><stop offset=".6" stop-color="#ffd2b8"/><stop offset="1" stop-color="#ffe7c9"/></linearGradient>'
+    +'<rect width="300" height="420" fill="url(#sun'+s+')"/>'
+    +'<circle cx="150" cy="250" r="46" fill="#ffb98f" opacity=".7"/>'+cloud(50,90)+cloud(230,70)
+    +'<path d="M0,250 C50,226 100,244 150,236 C210,226 250,250 300,240 L300,300 L0,300Z" fill="#d7ecc4"/>'
+    +row(s,298)
+    +'<path d="M0,300 L300,300 L300,420 L0,420Z" fill="url(#river'+s+')"/>'
+    +'<g transform="translate(0,600) scale(1,-1)" opacity=".18">'+row(s,300)+'</g>'
+    +'<path d="M110,320 L190,320 M125,334 L175,334 M135,348 L165,348" stroke="#ffe0c8" stroke-width="3" stroke-linecap="round" opacity=".9"/>'
+    +pin(90,190,'🍜')+'</svg>';}
+  // S1) 우표 스탬프: 톱니 테두리 우표 6장
+  function stamp(x,y,rot,inner,bg){var w=92,h=104,p='';
+    for(var i=0;i<=9;i++){p+='<circle cx="'+(-w/2+i*w/9)+'" cy="'+(-h/2)+'" r="3.2" fill="#ffeef2"/><circle cx="'+(-w/2+i*w/9)+'" cy="'+(h/2)+'" r="3.2" fill="#ffeef2"/>';}
+    for(var j=0;j<=10;j++){p+='<circle cx="'+(-w/2)+'" cy="'+(-h/2+j*h/10)+'" r="3.2" fill="#ffeef2"/><circle cx="'+(w/2)+'" cy="'+(-h/2+j*h/10)+'" r="3.2" fill="#ffeef2"/>';}
+    return '<g transform="translate('+x+','+y+') rotate('+rot+')"><rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" fill="#fff"/>'+p
+    +'<rect x="'+(-w/2+8)+'" y="'+(-h/2+8)+'" width="'+(w-16)+'" height="'+(h-16)+'" fill="'+bg+'"/>'+inner
+    +'<circle cx="'+(w/2-14)+'" cy="'+(-h/2+14)+'" r="9" fill="none" stroke="#e3a6b4" stroke-width="1.2" opacity=".8"/></g>';}
+  function s1(s){return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +'<path d="M0,250 C60,230 110,266 160,250 C210,234 250,262 300,244 L300,284 C250,302 210,274 160,290 C110,306 60,270 0,288Z" fill="url(#river'+s+')"/>'
+    +stamp(80,82,-4,palace(0,8,.7,s),'#fff3d9')+stamp(220,90,4,namsan(0,26,.46,s),'#e6f4da')
+    +stamp(84,208,3,gate(0,2,.85,s),'#fbe9e1')+stamp(218,214,-3,ddp(0,4,.9,s),'#e9f1fb')
+    +stamp(82,340,-2,b63(0,32,.8,s),'#fff3d9')+stamp(220,344,4,lotte(0,38,.6,s),'#e9f1fb')
+    +pin(150,148,'🍜')+'</svg>';}
+  // S2) 원형 배지 링: 배지 6개가 동그랗게, 가운데 한강 하트
+  function s2(s){var pts=[[150,62],[262,128],[262,262],[150,330],[38,262],[38,128]];
+    var items=[[palace,6,.5,'#fff3d9'],[ddp,4,.6,'#e9f1fb'],[lotte,26,.48,'#e9f1fb'],[b63,22,.58,'#fff3d9'],[gate,4,.55,'#fbe9e1'],[namsan,20,.44,'#e6f4da']];
+    var b='';pts.forEach(function(p,i){var it=items[i];b+=badge(p[0],p[1],36,it[0](p[0],p[1]+it[1],it[2],s),it[3]);});
+    return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +'<circle cx="150" cy="196" r="112" fill="none" stroke="#e3a6b4" stroke-width="2.2" stroke-dasharray="1 7" stroke-linecap="round"/>'
+    +'<ellipse cx="150" cy="196" rx="70" ry="54" fill="#e2f1d4"/>'
+    +'<path d="M84,200 C110,180 130,214 150,198 C170,182 190,212 216,196 L216,214 C190,230 170,200 150,216 C130,232 110,198 84,218Z" fill="url(#river'+s+')"/>'
+    +tree(122,170,7)+tree(140,162,8)+tree(176,168,7)
+    +b+pin(150,150,'🍜')+cloud(50,385)+cloud(240,395)+'</svg>';}
+
+
+  // P1 수정: 랜드마크 크게, 산 낮게, 위 빈 공간 줄임
+  function p1b(s){return '<svg viewBox="0 0 300 380">'+defs(s)+'<rect width="300" height="380" fill="url(#sky'+s+')"/>'
+    +'<circle cx="62" cy="88" r="20" fill="#ffd3b0" opacity=".85"/>'+cloud(200,50)+cloud(255,98)
+    +'<path d="M140,70 q5,-5 10,0 q5,-5 10,0 M176,62 q4,-4 8,0 q4,-4 8,0" stroke="#c98a9a" stroke-width="1.6" fill="none" stroke-linecap="round"/>'
+    +'<path d="M0,205 L35,178 L65,192 L105,165 L140,188 L180,170 L220,190 L258,168 L300,186 L300,280 L0,280Z" fill="#d9ecf2" opacity=".9"/>'
+    +'<path d="M0,228 C40,206 80,222 120,212 C160,202 200,224 240,214 C270,208 290,216 300,214 L300,280 L0,280Z" fill="#d7ecc4"/>'
+    +'<path d="M0,252 C50,240 90,248 140,246 C200,242 250,252 300,248 L300,280 L0,280Z" fill="#c4e3ac"/>'
+    +palace(40,250,.72,s)+gate(102,256,.66,s)+namsan(158,252,.88,s)+ddp(212,262,.72,s)+b63(250,268,.98,s)+lotte(282,270,1.08,s)
+    +'<path d="M0,268 C80,262 200,276 300,266 L300,380 L0,380Z" fill="url(#river'+s+')"/>'
+    +'<path d="M30,300 q8,-5 16,0 M120,322 q8,-5 16,0 M210,296 q8,-5 16,0 M70,352 q8,-5 16,0 M240,346 q8,-5 16,0" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+    +'<g transform="translate(160,345)"><path d="M-12,0 L12,0 L8,6 L-8,6Z" fill="#fff"/><path d="M0,0 L0,-14 L9,-2Z" fill="#ffb3c1"/></g>'
+    +pin(128,150,'🍜')+'</svg>';}
+
+  var ringPts=[[150,62],[262,128],[262,262],[150,330],[38,262],[38,128]];
+  var ringItems=[[palace,6,.5,'#fff3d9'],[ddp,4,.6,'#e9f1fb'],[lotte,26,.48,'#e9f1fb'],[b63,22,.58,'#fff3d9'],[gate,4,.55,'#fbe9e1'],[namsan,20,.44,'#e6f4da']];
+  function ring(s){var b='';ringPts.forEach(function(p,i){var it=ringItems[i];b+=badge(p[0],p[1],36,it[0](p[0],p[1]+it[1],it[2],s),it[3]);});return b;}
+  function waves(list){return '<path d="'+list.map(function(w){return 'M'+w[0]+','+w[1]+' q7,-5 14,0'}).join(' ')+'" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round"/>';}
+  function boat(x,y){return '<g transform="translate('+x+','+y+')"><path d="M-11,0 L11,0 L7,6 L-7,6Z" fill="#fff"/><path d="M0,0 L0,-13 L8,-2Z" fill="#ffb3c1"/></g>';}
+
+  // S2-a: 가운데 섬을 키우고 굵은 한강 + 다리 + 배
+  function s2a(s){return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +'<circle cx="150" cy="196" r="112" fill="none" stroke="#e3a6b4" stroke-width="2.2" stroke-dasharray="1 7" stroke-linecap="round"/>'
+    +'<ellipse cx="150" cy="196" rx="92" ry="78" fill="#e2f1d4"/>'
+    +'<path d="M58,196 C88,166 120,214 150,190 C180,166 212,212 242,186 L242,226 C212,250 180,206 150,230 C120,254 88,206 58,236Z" fill="url(#river'+s+')"/>'
+    +'<path d="M76,214 L92,212 M110,224 L122,223 M190,206 L206,204 M214,222 L226,221 M136,206 L146,205" stroke="#e8f6fd" stroke-width="2.4" stroke-linecap="round" opacity=".9"/>'
+    +tree(118,150,8)+tree(136,140,10)+tree(158,146,8)+tree(184,152,7)+tree(124,262,7)+tree(170,264,8)
+    +ring(s)+pin(150,128,'🍜')+cloud(50,385)+cloud(240,395)+'</svg>';}
+
+  // S2-b: 한강이 링 전체를 가로질러 흐르고, 배지가 그 위아래로
+  function s2b(s){return '<svg viewBox="0 0 300 420">'+defs(s)+'<rect width="300" height="420" fill="url(#sky'+s+')"/>'
+    +'<circle cx="150" cy="196" r="112" fill="#e2f1d4" opacity=".7"/>'
+    +'<circle cx="150" cy="196" r="112" fill="none" stroke="#e3a6b4" stroke-width="2.2" stroke-dasharray="1 7" stroke-linecap="round"/>'
+    +'<path d="M0,178 C50,150 100,206 150,180 C200,154 250,206 300,176 L300,226 C250,256 200,204 150,230 C100,256 50,200 0,228Z" fill="url(#river'+s+')"/>'
+    +waves([[20,206],[110,214],[200,196],[260,218],[150,222]])+boat(110,204)+boat(214,214)
+    +tree(120,150,8)+tree(140,142,10)+tree(166,150,8)+tree(130,256,8)+tree(172,262,7)
+    +ring(s)+pin(150,128,'🍜')+cloud(50,385)+cloud(240,395)+'</svg>';}
+
+  var opts=[
+    ['S2a','원형 배지 링 · 큰 한강 섬 (수정)','배 없이 물빛 선만',s2a]
+  ];
+  document.getElementById('cards').innerHTML = opts.map(function(o){
+    return '<div class="card" data-choice="'+o[0]+'" onclick="toggleSelect(this)"><div class="card-image" style="background:none;padding:8px 0"><div class="phone">'
+      +o[3]('s'+o[0])
+      +'<div class="hello"><b>안녕하세요! 👋</b>서울 어디로 떠나볼까요?</div>'
+      +'<div class="chips"><span class="chip">📍 내 주변 맛집</span><span class="chip">🏯 종로 관광지</span></div>'
+      +'<div class="inp">메시지 입력… <span class="gps">📍</span></div>'
+      +'</div></div><div class="card-body"><h3>'+o[0]+' · '+o[1]+'</h3><p>'+o[2]+'</p></div></div>';
+  }).join('');
+})();
+</script>
