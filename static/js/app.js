@@ -5,6 +5,7 @@ import { renderMap } from './map.js';
 import { cardHtml, bubbleHtml, foldBarHtml, placeChipsHtml } from './view.js';
 import { sendChat, fetchHistory } from './api.js';
 import { requestLocation } from './geo.js';
+import { startFollower } from './follower.js';
 
 const SESSION_KEY = 'stc.sessionId';
 const $ = (sel) => document.querySelector(sel);
@@ -46,7 +47,10 @@ function buildResult() {
   });
 }
 
+let stopFollower = null;
+
 function showResult() {
+  if (stopFollower) { stopFollower(); stopFollower = null; } // 🎒는 첫 화면에서만
   if (!$('#result').hidden) return;
   $('#home').hidden = true;
   $('#result').hidden = false;
@@ -225,6 +229,7 @@ async function restore() {
 // ---------- 시작 ----------
 buildResult();
 renderHome($('#home'), { onChip });
+stopFollower = startFollower();
 $('#gps').addEventListener('click', onGpsButton);
 $('#inp').addEventListener('submit', (e) => {
   e.preventDefault();
