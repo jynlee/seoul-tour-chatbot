@@ -39,8 +39,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---------- 첫 화면 S2a ---------- */
 .home { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .home-art { display: block; width: 100%; flex-shrink: 0; }
-@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-.bob { animation: bob 1.8s ease-in-out infinite; }
+/* 포인터를 따라다니는 🎒 (follower.js) — 클릭을 막지 않음 */
+.follower {
+  position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; user-select: none;
+  font-size: 24px; line-height: 1; opacity: 0; transition: opacity .35s ease;
+  will-change: transform; filter: drop-shadow(0 2px 2px rgba(200, 90, 120, .25));
+}
+.follower.show { opacity: 1; }
 .hello { padding: 4px 18px 10px; line-height: 1.45; font-size: 15px; }
 .hello b { font-size: 19px; display: block; margin-bottom: 1px; }
 .home-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }

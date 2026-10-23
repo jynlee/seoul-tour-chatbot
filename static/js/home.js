@@ -1,5 +1,6 @@
 // 첫 화면 S2a "원형 배지 링" — 시안 first-screen-s2a.html 의 s2a() 를 그대로 옮김.
 // 글자 라벨·배·흰 곡선 없음. 한강에는 짧은 물빛 선만.
+// 섬 위 🍜 핀은 사용자 요청으로 뺐다(2026-10-23). 대신 포인터를 따라다니는 🎒 (follower.js).
 import { defs, palace, gate, namsan, ddp, b63, lotte, tree, cloud, badge } from './landmarks.js';
 
 const RING_PTS = [[150, 62], [262, 128], [262, 262], [150, 330], [38, 262], [38, 128]];
@@ -21,11 +22,6 @@ function ring(s) {
   }).join('');
 }
 
-function homePin(x, y, e, c) {
-  return '<g class="bob"><circle cx="' + x + '" cy="' + y + '" r="9" fill="' + (c || '#ff9f43') + '" stroke="#fff" stroke-width="2.5"/>'
-    + '<text x="' + (x - 5.5) + '" y="' + (y + 4) + '" font-size="10">' + e + '</text></g>';
-}
-
 export function homeSvg(s = 'home') {
   return '<svg class="home-art" viewBox="0 0 300 420" aria-hidden="true">' + defs(s)
     + '<rect width="300" height="420" fill="url(#sky' + s + ')"/>'
@@ -34,7 +30,7 @@ export function homeSvg(s = 'home') {
     + '<path d="M58,196 C88,166 120,214 150,190 C180,166 212,212 242,186 L242,226 C212,250 180,206 150,230 C120,254 88,206 58,236Z" fill="url(#river' + s + ')"/>'
     + '<path d="M76,214 L92,212 M110,224 L122,223 M190,206 L206,204 M214,222 L226,221 M136,206 L146,205" stroke="#e8f6fd" stroke-width="2.4" stroke-linecap="round" opacity=".9"/>'
     + tree(118, 150, 8) + tree(136, 140, 10) + tree(158, 146, 8) + tree(184, 152, 7) + tree(124, 262, 7) + tree(170, 264, 8)
-    + ring(s) + homePin(150, 128, '🍜') + cloud(50, 385) + cloud(240, 395)
+    + ring(s) + cloud(50, 385) + cloud(240, 395)
     + '</svg>';
 }
 
