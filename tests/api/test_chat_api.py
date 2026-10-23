@@ -70,6 +70,11 @@ def test_given_session_id_is_echoed(client):
     assert body["session_id"] == "my-session-1"
 
 
+def test_session_id_64_chars_ok(client):
+    status, body = chat(client, GWANGHWAMUN_FOOD, session_id="s" * 64)
+    assert status == 200 and body["session_id"] == "s" * 64
+
+
 def test_two_new_sessions_are_different(client):
     _, a = chat(client, GWANGHWAMUN_FOOD)
     _, b = chat(client, GWANGHWAMUN_FOOD)
@@ -87,6 +92,7 @@ def test_two_new_sessions_are_different(client):
     {"message": None},
     {"message": "맛집", "location": {"lat": "abc", "lng": 126.97}},
     {"message": "맛집", "location": {"lat": 37.5}},
+    {"message": "맛집", "session_id": "x" * 65},  # QA-1: chat_message.session_id VARCHAR(64)
 ])
 def test_invalid_request_422(client, payload):
     r = client.post("/api/chat", json=payload)
