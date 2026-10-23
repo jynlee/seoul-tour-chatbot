@@ -32,7 +32,7 @@
 | F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ⬜ |
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ⬜ |
 | F4 | GPS 위치 | 팀원2 | F3 | ⬜ |
-| Q1 | API 테스트 스위트 | 팀원3 | **B6** | ⬜ |
+| Q1 | API 테스트 스위트 | 팀원3 | **B6** | 🔄 팀원3 |
 | Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | ⬜ |
 
 ## ④ 합의된 인터페이스
@@ -63,6 +63,7 @@
 ## ⑦ 팀원별 작업 로그 (컨텍스트 노트)
 명단(agentId): 리드가 팀원을 띄운 뒤 기록.
 - 팀원2 frontend: `a3f8272f943c570fa` (팀원1이 리드에게 받아 기록)
+- 팀원1 backend: `aba34c491b89ebbac` · 팀원3 qa: `a3b7fc5a951212262` (팀원3 기록)
 
 ### 리드
 - T0 완료: `app/config.py`(Settings·load_settings·ConfigError), `app/schemas.py`, `pytest.ini`(integration 마커), `requirements.txt`(설치 확인됨), `.env.example`, `data/seoul_tour.json`(원본 복사, 수정 금지).
@@ -88,7 +89,7 @@
 -
 
 ### 팀원3 qa
--
+- 2026-10-23 시작. 브랜치 `feat/qa`(origin/feat/backend e633eee에서 분기). worktree 루트에 메인 `.env` 복사(커밋 안 함). Q1 진행 중: `tests/api/`.
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
