@@ -1,13 +1,12 @@
 // 첫 화면 S2a "원형 배지 링" — 시안 first-screen-s2a.html 의 s2a() 를 그대로 옮김.
 // 글자 라벨·배·흰 곡선 없음. 한강에는 짧은 물빛 선만.
 // 섬 위 🍜 핀은 사용자 요청으로 뺐다(2026-10-23). 대신 포인터를 따라다니는 🎒 (follower.js).
-import { defs, palace, gate, namsan, ddp, b63, lotte, tree, cloud, badge } from './landmarks.js';
+import { defs, palace, gate, namsan, ddp, b63, lotte, tree, cloud, badge, BADGE_ART } from './landmarks.js';
 
 const RING_PTS = [[150, 62], [262, 128], [262, 262], [150, 330], [38, 262], [38, 128]];
 const RING_ITEMS = [
-  [palace, 6, 0.5, '#fff3d9'], [ddp, 4, 0.6, '#e9f1fb'], [lotte, 26, 0.48, '#e9f1fb'],
-  [b63, 22, 0.58, '#fff3d9'], [gate, 4, 0.55, '#fbe9e1'], [namsan, 20, 0.44, '#e6f4da'],
-];
+  [palace, 'gyeongbokgung'], [ddp, 'ddp'], [lotte, 'lotte'], [b63, 'b63'], [gate, 'sungnyemun'], [namsan, 'namsan'],
+].map(([fn, id]) => [fn, BADGE_ART[id].dy, BADGE_ART[id].k, BADGE_ART[id].col]);
 
 export const HOME_CHIPS = [
   { label: '📍 내 주변 맛집', message: '내 주변 맛집', gps: true },

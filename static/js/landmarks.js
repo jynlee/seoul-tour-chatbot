@@ -94,6 +94,16 @@ export function badge(x, y, r, inner, col) {
     + '<circle cx="' + x + '" cy="' + y + '" r="' + (r - 1.5) + '" fill="none" stroke="' + col + '" stroke-width="1" stroke-dasharray="2 3"/>' + inner + '</g>';
 }
 
+// 배지 안 그림 배치 (첫 화면 배지 링 시안 값): dy = 배지 가운데에서 건물 바닥까지, k = 배율, col = 배지 안쪽 색
+export const BADGE_ART = {
+  gyeongbokgung: { dy: 6, k: 0.5, col: '#fff3d9' },
+  ddp: { dy: 4, k: 0.6, col: '#e9f1fb' },
+  lotte: { dy: 26, k: 0.48, col: '#e9f1fb' },
+  b63: { dy: 22, k: 0.58, col: '#fff3d9' },
+  sungnyemun: { dy: 4, k: 0.55, col: '#fbe9e1' },
+  namsan: { dy: 20, k: 0.44, col: '#e6f4da' },
+};
+
 // draw(x, y, k, s): (x, y)는 건물 바닥 가운데. 지도에서 쓸 때 기준점이 바닥이 되도록 bottom 값을 둔다.
 export const LANDMARKS = [
   { id: 'gyeongbokgung', name: '경복궁', lat: 37.5796, lng: 126.9770, draw: palace },

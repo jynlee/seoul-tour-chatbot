@@ -102,6 +102,8 @@
 - **F3·F4 실제 연동 확인 완료**(feat/backend 병합 a8c27d1, uvicorn 8000): 광화문 맛집 5곳 핀 → 개성만두 궁 카드 → "거기 근처 카페 있어?" 핀 교체(카페 3곳) → 접기·칩→카드 → "고마워!" 지도 유지 → 새로고침 복원(성수 카페) → GPS(가짜 geo 좌표 주입)로 내 위치 파란 점·걸어서 점선 → OPENSEARCH_PORT=9299로 띄운 서버에서 503 오류 말풍선. 스크린샷 `scratchpad/shots/real-*.png`.
 - 연동 중 고친 것: 채팅 fetch 90초 타임아웃(첫 Ollama 호출이 느림, "답변이 너무 오래 걸려요" 문구), 강 있을 때 범례 클래스 `.top`이 상단 바 `.top` CSS와 겹쳐 글자가 커지던 버그 → `.up`으로 변경, 요약 바 "근처 · 추천" 띄어쓰기.
 - 미확인: Chrome 개발자도구 Sensors로 실제 위치 권한 허용/차단 수동 확인은 못 함(헤드리스에서 navigator.geolocation을 가짜로 바꿔 확인). Q2에서 확인 부탁.
+- 상단 바 시안 A(사용자 확정, 고운돋움은 되돌림): 🗺️ 삭제, Jua 21px "서울"(#ff6f8d) "여행친구"(#5a4632), 왼쪽 40px 랜드마크 배지(`brand.js` pickBadge·badgeSvg). 배지 = 응답 center에서 가장 가까운 6대 랜드마크(거리 제한 없음), center null이면 직전 배지, 처음엔 광화문(경복궁). 바뀔 때 Y축 뒤집기 0.4초, reduced-motion이면 바로. 새로고침 복원은 마지막 center로. 배지 그림 배치값은 `landmarks.js` BADGE_ART로 첫 화면 링과 공유.
+- 참고: 명동(37.5636,126.9827)은 "가장 가까운" 규칙상 숭례문(0.8km)이 남산타워(1.4km)보다 가까워 숭례문 배지가 됨.
 - **함정: Node 24에서 `node --test tests/js`(디렉터리)는 MODULE_NOT_FOUND로 실패** → `node --test "tests/js/*.test.mjs"`로 실행해야 함(완료 조건 명령도 이걸로).
 - 함정: Windows에서 헤드리스 Chrome `--window-size=393,…`은 최소 폭(약 500px) 때문에 실제로는 393이 안 됨 → 393×852 iframe을 감싼 페이지를 찍어서 비교함.
 
