@@ -12,7 +12,7 @@
 | 역할 | 담당 태스크 | 작업 브랜치 |
 |---|---|---|
 | 리드 | T0, 병합·최종 확인 | main |
-| 팀원1 backend | B1~B6 | worktree 브랜치 (시작 시 기록) |
+| 팀원1 backend | B1~B6 | `feat/backend` |
 | 팀원2 frontend | F1~F4 | worktree 브랜치 (시작 시 기록) |
 | 팀원3 qa | Q1~Q2 (B6 완료 후 시작) | worktree 브랜치 (시작 시 기록) |
 
@@ -22,10 +22,10 @@
 | ID | 내용 | 담당 | 선행 | 상태 |
 |---|---|---|---|---|
 | T0 | 뼈대·설정·API 계약 초안·이 문서 | 리드 | — | ✅ |
-| B1 | 카탈로그 + 전화번호 보강 | 팀원1 | T0 | ⬜ |
-| B2 | 거리·지역 이름표·기준점 결정 | 팀원1 | T0 | ⬜ |
-| B3 | seoul-tour-v2 인덱스 + kNN 후보 검색 | 팀원1 | B1 | ⬜ |
-| B4 | chat_message 대화 기록 저장소 | 팀원1 | T0 | ⬜ |
+| B1 | 카탈로그 + 전화번호 보강 | 팀원1 | T0 | 🔄 팀원1 (코드 ✅, 보강 실행 중) |
+| B2 | 거리·지역 이름표·기준점 결정 | 팀원1 | T0 | ✅ 팀원1 |
+| B3 | seoul-tour-v2 인덱스 + kNN 후보 검색 | 팀원1 | B1 | 🔄 팀원1 |
+| B4 | chat_message 대화 기록 저장소 | 팀원1 | T0 | ✅ 팀원1 |
 | B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ⬜ |
 | B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ⬜ |
 | F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ⬜ |
@@ -39,6 +39,13 @@
 **초안 (T0, 리드):** `app/schemas.py` — `ChatRequest{session_id?, message(1~500자, 앞뒤 공백 제거), location?{lat,lng}, selected_place_id?}` → `ChatResponse{session_id, answer, center?{lat,lng,label,source: gps|place|area|gu|history}, places[PlaceOut{id,title,kind: food|tour,category,addr,tel,lat,lng,image,distance_m?,walk_min?}]}` / `GET /api/history/{session_id}` → `{session_id, messages[{role,message,center?,places,created_at}]}` / `GET /api/health` → `{opensearch,ollama,mysql: bool}` / 503 `detail`: "검색 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."
 
 **확정:** (팀원1·2가 SendMessage로 합의 후 여기에 기록 — 날짜, 바뀐 점)
+- 2026-10-23 팀원1·2 합의: 초안 그대로 확정(필드 변경 없음). 보충 규칙:
+  - 축제/행사(contenttypeid 15)는 `kind:"tour"`로 나감(분홍 핀). 내부 `Place.kind`의 `"event"`는 API에 노출 안 됨.
+  - `category`는 한글 분류명: 음식점은 cat3 수준(`한식`·`양식`·`일식`·`중식`·`이색음식점`·`카페/전통찻집`), 그 외는 cat2 수준(`역사관광지`·`자연관광지`·`휴양관광지`·`체험관광지`·`건축/조형물`·`문화시설`·`축제`·`공연/행사`·`육상레포츠`·`수상레포츠`·`쇼핑` 등), 없으면 `기타`. 프론트 이모지: `카페/전통찻집`→☕, 그 외 food→🍽️, tour는 category 키워드로.
+  - `tel`·`image`는 없으면 `""`. `center`가 `null`이면 `distance_m`·`walk_min`도 `null`.
+  - 일상 대화 응답은 `places: []`, `center: null` (지도 유지).
+  - `/api/history`: `created_at`은 ISO 문자열(`2026-10-23T14:05:00`), 오래된 순, 없는 세션은 `messages: []`. user 메시지는 `center:null, places:[]`.
+  - 오류: 422(FastAPI 기본 검증 형식), 503 `{"detail":"검색 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."}`.
 
 ## ⑤ 결정 사항 로그
 - 2026-10-23 리드: 이 환경(Claude Code 2.1.309)에는 공유 태스크 리스트 전용 도구가 없어서 **이 문서 ③ 표를 공유 태스크 리스트로 쓴다**. 팀원은 백그라운드 에이전트로 뜨고, 서로 agentId로 `SendMessage` 한다(아래 ⑦ 명단).
@@ -49,13 +56,20 @@
 
 ## ⑦ 팀원별 작업 로그 (컨텍스트 노트)
 명단(agentId): 리드가 팀원을 띄운 뒤 기록.
+- 팀원2 frontend: `a3f8272f943c570fa` (팀원1이 리드에게 받아 기록)
 
 ### 리드
 - T0 완료: `app/config.py`(Settings·load_settings·ConfigError), `app/schemas.py`, `pytest.ini`(integration 마커), `requirements.txt`(설치 확인됨), `.env.example`, `data/seoul_tour.json`(원본 복사, 수정 금지).
 - 함정: 원본 데이터 `tel` 574건 전부 빈 값, `도심속 바다축제`만 좌표 0.
 
 ### 팀원1 backend
--
+- 2026-10-23 시작. 브랜치 `feat/backend`. worktree 루트에 메인 `.env` 복사해 사용(커밋 안 함).
+- 함정(데이터): 좌표 0인 `도심속 바다축제` 외에 **좌표가 (19.69, 117.99)로 잘못 들어간 장소 6곳**(계남근린공원 2건·대치유수지체육공원·관악구민운동장·반포종합운동장·롯데백화점 김포공항점). → `has_coords`는 0 검사 + 서울 범위(위도 37.3~37.8, 경도 126.6~127.3) 검사. 이걸 안 하면 `강남구` 평균 좌표가 37.15로 틀어짐. 프론트도 지도 bounds 계산 시 같은 범위 밖 좌표는 무시 권장(백엔드는 이런 장소를 places에 넣지 않음).
+- 함정(데이터): `계남근린공원` 제목 중복(id 다름). 원본 `cat2` `A0401`(쇼핑)이 기존 `cat2_map`에 없어 `쇼핑`을 추가함.
+- 결정(B2): 기준점 규칙 보충 — ⑥ 구 이름은 `종로`처럼 '구'를 뗀 이름(2글자 이상, `중구` 제외)도 인정(첫 화면 칩 "🏯 종로 관광지"용). ③ 장소명은 질문 속 지역·구 이름 안에 들어 있는 짧은 제목은 무시(예: `강남역` 속 장소 `강남`). ⑤ 동 이름은 주소 토큰에서 `○○동`/`○○동N가`를 뽑음.
+- B4: `chat_message` 테이블 생성 완료(`scripts/init_db.sql`, `MySQLHistoryRepo.ensure_table()`도 같은 DDL). MySQL 통합 테스트는 `test-` 접두 세션만 쓰고 끝나면 지움. 연결은 요청마다 새로 맺음(단순·스레드 안전, 대신 101건 저장 테스트가 ~15초).
+- B1: 보강 스크립트 `--limit 5` 정상(5건 모두 tel 있음). 전체 실행 중 → 끝나면 `data/seoul_tour_enriched.json` 별도 커밋.
+- 알려진 한계: 2글자 장소명(`기후`, `길목`, `기와` 등)이 일반 단어로 질문에 들어가면 그 장소가 기준점이 됨(드묾, 그대로 둠).
 
 ### 팀원2 frontend
 -
