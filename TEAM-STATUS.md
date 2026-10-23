@@ -13,7 +13,7 @@
 |---|---|---|
 | 리드 | T0, 병합·최종 확인 | main |
 | 팀원1 backend | B1~B6 | worktree 브랜치 (시작 시 기록) |
-| 팀원2 frontend | F1~F4 | worktree 브랜치 (시작 시 기록) |
+| 팀원2 frontend | F1~F4 | `feat/frontend` |
 | 팀원3 qa | Q1~Q2 (B6 완료 후 시작) | worktree 브랜치 (시작 시 기록) |
 
 ## ③ 태스크 분해 (공유 태스크 리스트)
@@ -28,8 +28,8 @@
 | B4 | chat_message 대화 기록 저장소 | 팀원1 | T0 | ⬜ |
 | B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ⬜ |
 | B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ⬜ |
-| F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ⬜ |
-| F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ⬜ |
+| F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ✅ 팀원2 |
+| F2 | 일러스트 지도 모듈 | 팀원2 | F1 | 🔄 팀원2 |
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ⬜ |
 | F4 | GPS 위치 | 팀원2 | F3 | ⬜ |
 | Q1 | API 테스트 스위트 | 팀원3 | **B6** | ⬜ |
@@ -48,7 +48,7 @@
 (없음)
 
 ## ⑦ 팀원별 작업 로그 (컨텍스트 노트)
-명단(agentId): 리드가 팀원을 띄운 뒤 기록.
+명단(agentId): 리드가 팀원을 띄운 뒤 기록. 팀원1 backend = `aba34c491b89ebbac`
 
 ### 리드
 - T0 완료: `app/config.py`(Settings·load_settings·ConfigError), `app/schemas.py`, `pytest.ini`(integration 마커), `requirements.txt`(설치 확인됨), `.env.example`, `data/seoul_tour.json`(원본 복사, 수정 금지).
@@ -58,7 +58,12 @@
 -
 
 ### 팀원2 frontend
--
+- 브랜치 `feat/frontend`. 팀원1(backend) agentId `aba34c491b89ebbac`로 API 조율.
+- F1 완료: `static/index.html`, `css/app.css`, `js/landmarks.js`(시안 SVG 그대로), `js/home.js`(renderHome·S2a), `js/app.js`. 입력창(`#inp`)은 홈/결과 공용으로 index.html에 고정.
+- 결정: 계획과 달리 DOM에 의존하지 않는 모듈은 따로 뺌 — `home.js`(renderHome), F3의 `view.js`(cardHtml·chipLabel), F4의 `geo.js`(requestLocation). app.js는 import 시 DOM을 건드려서 node 테스트에서 import 불가하기 때문.
+- 결정: 크기는 결과 시안(폰 폭 300px) → 393px 기준 약 1.3배로 맞춤. 첫 화면 칩 3개(📍 내 주변 맛집·🏯 종로 관광지·☕ 성수 카페)가 한 줄에 들어가게 12.5px.
+- API 계약: 팀원1과 2026-10-23 합의(④). 핀 이모지는 category 키워드로 고름(카페/전통찻집→☕, food→🍽️, 역사→🏯, 자연·휴양·공원→🌳, 쇼핑→🛍️, 문화→🏛️, 축제·행사·공연→🎉, 레포츠→🏃, 기본 📍).
+- 함정: Windows에서 헤드리스 Chrome `--window-size=393,…`은 최소 폭(약 500px) 때문에 실제로는 393이 안 됨 → 393×852 iframe을 감싼 페이지를 찍어서 비교함.
 
 ### 팀원3 qa
 -
