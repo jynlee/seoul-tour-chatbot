@@ -214,6 +214,28 @@ export function spreadPins(items, { width = MAP_W, height = MAP_H, minY = 50, ma
   return out;
 }
 
+// 랜드마크 미니 일러스트(배율 0.72)가 차지하는 영역. (x, y) = 건물 바닥 가운데.
+const LM_HEIGHT = { gyeongbokgung: 36, sungnyemun: 32, namsan: 80, ddp: 20, b63: 56, lotte: 78 };
+export function landmarkBox(q) {
+  const h = LM_HEIGHT[q.l.id] || 60;
+  return { x: q.x - 36, y: q.y - h, w: 72, h: h + 8 };
+}
+
+// 넓은 범위 지도에서 랜드마크끼리·핀과 겹치지 않게 고른다. 지도 가운데에 가까운 것부터.
+// pins: [{x, y, lw}] (pinBox 기준)
+export function pickLandmarks(cands, pins, { width = MAP_W, height = MAP_H } = {}) {
+  const pinBoxes = pins.map((q) => { const b = pinBox(q); return { x: b.x - 6, y: b.y - 6, w: b.w + 12, h: b.h + 12 }; });
+  const chosen = [];
+  const sorted = [...cands].sort((a, b) => Math.hypot(a.x - width / 2, a.y - height / 2) - Math.hypot(b.x - width / 2, b.y - height / 2));
+  for (const q of sorted) {
+    const box = landmarkBox(q);
+    if (pinBoxes.some((p) => overlaps(box, p))) continue;
+    if (chosen.some((c) => overlaps(box, landmarkBox(c)))) continue;
+    chosen.push(q);
+  }
+  return chosen;
+}
+
 // ---------- 렌더 ----------
 // center: {lat,lng,label}|null, places: PlaceOut[], me: {lat,lng}|null
 export function renderMap(el, { center = null, places = [], me = null, selectedId = null, onPinClick } = {}) {
@@ -234,10 +256,13 @@ export function renderMap(el, { center = null, places = [], me = null, selectedI
 
   const pins = spreadPins(shown.map((p) => ({ p, lw: labelWidth(p.title), ...toXY(p) })), { minY: ins.top, maxY: H - ins.bottom + 4 })
     .sort((a, b) => a.y - b.y);
-  const lms = LANDMARKS.filter((l) => l.lat >= bounds.minLat && l.lat <= bounds.maxLat && l.lng >= bounds.minLng && l.lng <= bounds.maxLng)
-    .map((l) => ({ l, ...toXY(l) }));
+  const lms = pickLandmarks(
+    LANDMARKS.filter((l) => l.lat >= bounds.minLat && l.lat <= bounds.maxLat && l.lng >= bounds.minLng && l.lng <= bounds.maxLng)
+      .map((l) => ({ l, ...toXY(l) })),
+    pins,
+  );
   const avoid = pins.map((q) => ({ x: q.x - 34, y: q.y - 50, w: 68, h: 74 }))
-    .concat(lms.map((q) => ({ x: q.x - 40, y: q.y - 60, w: 80, h: 80 })));
+    .concat(lms.map(landmarkBox));
 
   let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + defs('map')
     + background(rng, { river, avoid });

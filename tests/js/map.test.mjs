@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeBounds, project, mulberry32, seedFor, riverVisible, spreadPins, pinBox } from '../../static/js/map.js';
+import { computeBounds, project, mulberry32, seedFor, riverVisible, spreadPins, pinBox, pickLandmarks, landmarkBox } from '../../static/js/map.js';
 import { placeEmoji } from '../../static/js/emoji.js';
 
 const W = 400, H = 350;
@@ -100,6 +100,16 @@ test('겹치는 핀은 서로 밀어내서 겹치지 않게 된다', () => {
   assert.equal(ov(pinBox(out[0]), pinBox(out[1])), false);
   assert.deepEqual(out[2], items[2]); // 안 겹친 핀은 그대로
   for (const q of out) assert.ok(q.x >= 0 && q.x <= W && q.y >= 0 && q.y <= H);
+});
+
+test('랜드마크는 서로·핀과 겹치면 빼고 고른다', () => {
+  const lm = (id, x, y) => ({ l: { id }, x, y });
+  const cands = [lm('gyeongbokgung', 200, 175), lm('sungnyemun', 210, 190), lm('namsan', 220, 200), lm('lotte', 360, 300)];
+  const pins = [{ x: 360, y: 300, lw: 60 }];
+  const out = pickLandmarks(cands, pins);
+  assert.deepEqual(out.map((q) => q.l.id), ['gyeongbokgung']); // 가운데 것 하나만, 핀 위 롯데타워는 제외
+  const ov = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  for (const q of out) assert.equal(ov(landmarkBox(q), pinBox(pins[0])), false);
 });
 
 test('핀 이모지', () => {
