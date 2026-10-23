@@ -119,6 +119,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: flex; justify-content: space-between; align-items: center;
   padding: 10px 16px; font-weight: 700; font-size: 17px; flex-shrink: 0;
 }
+.top .brand { display: inline-flex; align-items: center; gap: 6px; }
+.top .brand-ico { font-size: 17px; line-height: 1; }
+/* 제목만 고운돋움 (Google Fonts, SIL OFL). 굵은 굵기가 없는 서체라 400 고정. 실패하면 기본 서체로 */
+.top .brand-name {
+  font-family: "Gowun Dodum", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  font-weight: 400; font-size: 22px; line-height: 1.2;
+}
 .top .toggle {
   border: 0; background: none; padding: 4px 0; font-weight: 400; color: #c07a8a; font-size: 14px;
 }
