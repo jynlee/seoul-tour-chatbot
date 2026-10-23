@@ -247,8 +247,8 @@ export function renderMap(el, { center = null, places = [], me = null, selectedI
   // 선택한 장소까지 걷는 점선
   const sel = pins.find((q) => q.p.id === selectedId);
   let walk = false;
-  if (sel && valid(me || center)) {
-    const o = toXY(me || center);
+  if (sel && valid(me)) {
+    const o = toXY(me);
     if (Math.hypot(o.x - sel.x, o.y - sel.y) > 12) {
       const mx = (o.x + sel.x) / 2 + (sel.y - o.y) * 0.15, my = (o.y + sel.y) / 2 - (sel.x - o.x) * 0.15;
       svg += '<path d="M' + r1(o.x) + ',' + r1(o.y) + ' Q' + r1(mx) + ',' + r1(my) + ' ' + r1(sel.x) + ',' + r1(sel.y) + '" stroke="#7a6a58" stroke-width="2" stroke-dasharray="4 5" fill="none"/>';
