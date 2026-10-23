@@ -26,8 +26,8 @@
 | B2 | 거리·지역 이름표·기준점 결정 | 팀원1 | T0 | ✅ 팀원1 |
 | B3 | seoul-tour-v2 인덱스 + kNN 후보 검색 | 팀원1 | B1 | ✅ 팀원1 |
 | B4 | chat_message 대화 기록 저장소 | 팀원1 | T0 | ✅ 팀원1 |
-| B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | 🔄 팀원1 |
-| B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ⬜ |
+| B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ✅ 팀원1 |
+| B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | 🔄 팀원1 |
 | F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ⬜ |
 | F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ⬜ |
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ⬜ |
@@ -70,6 +70,9 @@
 - B4: `chat_message` 테이블 생성 완료(`scripts/init_db.sql`, `MySQLHistoryRepo.ensure_table()`도 같은 DDL). MySQL 통합 테스트는 `test-` 접두 세션만 쓰고 끝나면 지움. 연결은 요청마다 새로 맺음(단순·스레드 안전, 대신 101건 저장 테스트가 ~15초).
 - B1: 보강 스크립트 `--limit 5` 정상(5건 모두 tel 있음). 전체 실행 중 → 끝나면 `data/seoul_tour_enriched.json` 별도 커밋.
 - B3: `seoul-tour-v2` 574건 색인 완료(`python scripts/build_index.py`, 임베딩 포함 약 1분). 문서 `_id`=contentid. 좌표 없는 7곳은 `location` 필드만 뺌. 기존 `seoul-tour` 인덱스는 이 OpenSearch에 원래 없음(건드리지 않음). kNN 결과 예: "성수 카페"+cat3 필터 → 성수 카페 5곳 정상.
+- 결정(B5): ① 축제·행사·공연 키워드**만** 있으면 types=`{"15"}`만("이번 주 축제"에 음식점이 섞이지 않게), 다른 키워드와 같이 있으면 15 추가. ② 카페 cat3 필터는 카페 키워드만 있을 때("카페랑 맛집"은 음식점 전체). ③ 반경 1500m 안이 1~2곳이면 같은 조건의 가장 가까운 곳으로 **3곳까지 채움**(거리·도보는 실제값; 음식점이 100곳뿐이라 자주 생김). 0곳이면 계획대로 가장 가까운 3곳 + fallback_note.
+- B5: Ollama 호출에 `"think": false` 넣음(gemma4 생각 출력 방지). 실호출 약 4초, 첫 호출은 모델 로딩 ~13초. 타임아웃 30초 → `LLMUnavailable` → 템플릿 답변.
+- 테스트: `tests/__init__.py` 추가(패키지) → 테스트에서 `from tests.conftest import FakeSearcher` 가능. conftest에 `small_catalog`, `FakeEmbedder`, `FakeSearcher(catalog, scores, fail)`, `FakeLLM(answer, fail)`.
 - 알려진 한계: 2글자 장소명(`기후`, `길목`, `기와` 등)이 일반 단어로 질문에 들어가면 그 장소가 기준점이 됨(드묾, 그대로 둠).
 
 ### 팀원2 frontend
