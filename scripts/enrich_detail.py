@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.enrich_tel import QuotaExceeded, _call, _scrub  # noqa: E402
+from scripts.enrich_tel import QuotaExceeded, _call, _scrub, save_json  # noqa: E402
 
 # 사람이 실제로 묻는 항목만 공통 키로 모은다. 값: 타입별 detailIntro2 필드 (앞에서부터 이어 붙임)
 DETAIL_FIELDS: dict[str, dict[str, tuple[str, ...]]] = {
@@ -142,7 +142,7 @@ def main(argv=None) -> int:
             failed += 1
             print(f"실패 {cid} {item.get('title')}: {_scrub(e, key)}", flush=True)
             continue
-        out.write_text(json.dumps(enriched, ensure_ascii=False, indent=1), encoding="utf-8")
+        save_json(out, enriched)
         done += 1
         print(f"[{done}] {item.get('title')}: {', '.join(entry['detail']) or '(없음)'}", flush=True)
         time.sleep(args.sleep)

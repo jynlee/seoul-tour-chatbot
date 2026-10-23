@@ -8,6 +8,7 @@
 """
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -44,6 +45,21 @@ def pick_tel(common: dict | None, intro: dict | None) -> str:
         if tel:
             return tel
     return ""
+
+
+def save_json(path: Path, data: dict, retries: int = 5) -> None:
+    """임시 파일에 쓴 뒤 교체(중간에 끊겨도 파일이 깨지지 않음). Windows 파일 잠금이면 잠깐 쉬고 재시도."""
+    path = Path(path)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    for attempt in range(retries):
+        try:
+            tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+            os.replace(tmp, path)
+            return
+        except OSError:
+            if attempt == retries - 1:
+                raise
+            time.sleep(0.5 * (attempt + 1))
 
 
 def _scrub(error, api_key: str) -> str:
@@ -129,7 +145,7 @@ def main(argv=None) -> int:
             print(f"실패 {cid} {item.get('title')}: {_scrub(e, settings.tour_api_key)}")
             continue
         enriched[cid] = {"tel": tel}
-        out.write_text(json.dumps(enriched, ensure_ascii=False, indent=1), encoding="utf-8")
+        save_json(out, enriched)
         done += 1
         print(f"[{len(enriched)}/{len(items)}] {item.get('title')}: {tel or '(없음)'}")
         time.sleep(args.sleep)
