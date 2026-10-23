@@ -32,8 +32,8 @@
 | F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ⬜ |
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ⬜ |
 | F4 | GPS 위치 | 팀원2 | F3 | ⬜ |
-| Q1 | API 테스트 스위트 | 팀원3 | **B6** | 🔄 팀원3 |
-| Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | ⬜ |
+| Q1 | API 테스트 스위트 | 팀원3 | **B6** | ✅ 팀원3 |
+| Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | 🔄 팀원3 |
 
 ## ④ 합의된 인터페이스
 **초안 (T0, 리드):** `app/schemas.py` — `ChatRequest{session_id?, message(1~500자, 앞뒤 공백 제거), location?{lat,lng}, selected_place_id?}` → `ChatResponse{session_id, answer, center?{lat,lng,label,source: gps|place|area|gu|history}, places[PlaceOut{id,title,kind: food|tour,category,addr,tel,lat,lng,image,distance_m?,walk_min?}]}` / `GET /api/history/{session_id}` → `{session_id, messages[{role,message,center?,places,created_at}]}` / `GET /api/health` → `{opensearch,ollama,mysql: bool}` / 503 `detail`: "검색 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."
@@ -91,8 +91,12 @@
 -
 
 ### 팀원3 qa
-- 2026-10-23 시작. 브랜치 `feat/qa`(origin/feat/backend e633eee에서 분기). worktree 루트에 메인 `.env` 복사(커밋 안 함). Q1 진행 중: `tests/api/`.
+- 2026-10-23 시작. 브랜치 `feat/qa`(origin/feat/backend e633eee에서 분기). worktree 루트에 메인 `.env` 복사(커밋 안 함).
+- Q1 완료: `tests/api/`(가짜 의존성 56건: 계약·422·세션·멀티턴 "거기 근처"·places 교체·Review Focus 1~5·잘못된 좌표·지어낸 장소·기록 저장소 장애·history·health) + `tests/integration/test_live_api.py`(실서비스 8건, `test-qa-` 세션만 쓰고 끝나면 삭제). `pytest -m "not integration"` 129 통과, `pytest -m integration` 8 통과.
+- 버그 QA-1(팀원1, 850364d로 수정·재확인 완료): session_id 64자 초과 시 200인데 MySQL 저장이 조용히 실패 → 이제 65자 이상은 422.
+- 함정: Git Bash에서 `curl -d '{"message":"한글"}'`은 인코딩이 깨져 400 "There was an error parsing the body"가 남(서버 문제 아님) → 파이썬 requests나 UTF-8 파일 `--data-binary @파일`로 보낼 것. 포트 8001은 다른 프로세스(정적 http 서버)가 쓰는 중 → QA 서버는 8011. 8000은 사용자용 서버(끄지 말 것).
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
 - 팀원1: B1~B6 완료(`feat/backend`). 남은 일은 팀원3(Q1·Q2) 버그 리포트 대응. Q1은 `tests/conftest.py`의 `small_catalog`·`FakeEmbedder`·`FakeSearcher`·`FakeLLM`과 `InMemoryHistoryRepo`로 `create_app(Deps(...))`를 만들면 됨(예: `tests/test_chat_service.py`).
+- 팀원3: Q1 완료(`feat/qa`). Q2 진행 중(feat/frontend 2c0f870 기준, 포트 8011, `docs/manual-qa.md`·`tests/integration/test_live_chat.py`).
