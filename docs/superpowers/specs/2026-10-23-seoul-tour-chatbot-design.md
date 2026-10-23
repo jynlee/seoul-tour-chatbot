@@ -176,9 +176,9 @@ GET /api/health                → OpenSearch/Ollama/MySQL 연결 상태
 
 ## 8. 실행 환경 · 제약
 - Windows 11, Python 3.11.9, Node 24(테스트 도구용으로만 필요 시), Java 불필요.
-- OpenSearch: 실행 중이지만 **`admin/admin`으로는 인증 실패** → 사용자가 실제 계정을 `.env`에 직접 넣는다 **[결정]**. 코드는 `.env`가 비어 있으면 무엇이 빠졌는지 알려주고 멈춘다.
-- MySQL 8.4 실행 중. 계정은 기존 소스와 같음(변경 없음) **[결정]**, 값은 사용자가 `.env`에 직접 넣는다. `seoul_tour` DB/`chat_history` 테이블 존재 여부 미확인 — 없으면 생성 스크립트 제공 **[제안]**.
-- 포트 8080은 이미 다른 프로그램이 사용 중 → FastAPI는 **8000** **[제안]**.
+- OpenSearch: 다른 프로젝트의 `food-opensearch` Docker 컨테이너(3.3.2, **https**://localhost:9200)를 공유한다 **[결정]**. 이 프로젝트는 `seoul-tour-v2` 인덱스만 쓰고 다른 인덱스는 건드리지 않는다. 계정은 `.env`.
+- MySQL: 이 프로젝트 전용 Docker 컨테이너 `seoul-tour-mysql`(mysql:8.0, 포트 3306, DB `seoul_tour` 생성됨, utf8mb4, 볼륨 `seoul-tour-mysql-data`) **[결정]**. 계정은 기존 소스와 같고 `.env`에 있다. PC에 설치된 MySQL 8.4(3307)는 쓰지 않는다. `chat_message` 테이블은 `scripts/init_db.sql`로 만든다.
+- 포트 8000을 쓴다 **[제안]**. (성적 관리 프로젝트 컨테이너는 2026-10-23 정지해서 3306·8080이 비어 있음)
 - 확인은 **PC 브라우저의 모바일 보기(localhost)** 로 한다 **[결정]**. 휴대폰 실기기 시연(https 필요)은 이번 범위가 아니고 추후 진행.
 
 ## 9. 테스트 [제안]
