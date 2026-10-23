@@ -1,4 +1,8 @@
-from scripts.enrich_tel import pick_tel
+from scripts.enrich_tel import _scrub, pick_tel
+
+
+def test_scrub_hides_key():
+    assert _scrub(Exception("url?serviceKey=SECRET123&x=1"), "SECRET123") == "url?serviceKey=***&x=1"
 
 
 def test_common_tel_first():
