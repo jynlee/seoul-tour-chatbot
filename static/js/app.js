@@ -6,6 +6,7 @@ import { cardHtml, bubbleHtml, foldBarHtml, placeChipsHtml } from './view.js';
 import { sendChat, fetchHistory } from './api.js';
 import { requestLocation } from './geo.js';
 import { startFollower } from './follower.js';
+import { pickBadge, badgeSvg, DEFAULT_BADGE } from './brand.js';
 
 const SESSION_KEY = 'stc.sessionId';
 const $ = (sel) => document.querySelector(sel);
@@ -20,7 +21,25 @@ const state = {
   mapOpen: true,
   pendingLocation: null, // 📍로 받은 좌표, 다음 전송에 한 번 실어 보냄 (F4)
   busy: false,
+  badgeId: DEFAULT_BADGE, // 상단 배지 랜드마크 (center에서 가장 가까운 것)
 };
+
+// 배지 교체: Y축으로 살짝 뒤집히며 바뀜(0.4초). 같은 랜드마크면 그대로, 움직임 줄이기면 바로.
+function setBadge(center) {
+  const id = pickBadge(center, state.badgeId);
+  if (id === state.badgeId) return;
+  state.badgeId = id;
+  const el = $('#badge');
+  const swap = () => { el.innerHTML = badgeSvg(id); };
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced || typeof el.animate !== 'function') { swap(); return; }
+  el.getAnimations().forEach((a) => a.cancel());
+  el.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(90deg)' }], { duration: 200, easing: 'ease-in' })
+    .onfinish = () => {
+      swap();
+      el.animate([{ transform: 'rotateY(-90deg)' }, { transform: 'rotateY(0deg)' }], { duration: 200, easing: 'ease-out' });
+    };
+}
 
 function loadSession() {
   try { return localStorage.getItem(SESSION_KEY); } catch { return null; }
@@ -32,7 +51,8 @@ function saveSession(id) {
 
 // ---------- 결과 화면 뼈대 ----------
 function buildResult() {
-  $('#result').innerHTML = '<div class="top"><span class="brand"><span class="brand-ico" aria-hidden="true">🗺️</span><span class="brand-name">서울 여행 친구</span></span>'
+  $('#result').innerHTML = '<div class="top"><span class="brand"><span class="badge" id="badge">' + badgeSvg(state.badgeId) + '</span>'
+    + '<span class="brand-name"><span class="seoul">서울</span> 여행친구</span></span>'
     + '<button type="button" class="toggle" id="toggle" hidden>▾ 지도 접기</button></div>'
     + '<div class="map" id="map" hidden></div>'
     + '<button type="button" class="fold" id="fold" hidden></button>'
@@ -146,6 +166,7 @@ async function send(message) {
     if (res.session_id) saveSession(res.session_id);
     typing.remove();
     addBubble('assistant', res.answer);
+    setBadge(res.center);
     // 장소가 있는 답변만 지도를 바꾼다 (인사·감사 등은 지도 유지)
     if (res.places && res.places.length) {
       const me = res.center && res.center.source === 'gps' ? { lat: res.center.lat, lng: res.center.lng } : null;
@@ -219,6 +240,11 @@ async function restore() {
   if (!msgs.length) return;
   showResult();
   for (const m of msgs) addBubble(m.role === 'user' ? 'user' : 'assistant', m.message);
+  const lastCenter = [...msgs].reverse().find((m) => m.role !== 'user' && m.center);
+  if (lastCenter) { // 복원은 애니메이션 없이 바로
+    state.badgeId = pickBadge(lastCenter.center, state.badgeId);
+    $('#badge').innerHTML = badgeSvg(state.badgeId);
+  }
   const last = [...msgs].reverse().find((m) => m.role !== 'user' && m.places && m.places.length);
   if (last) {
     const me = last.center && last.center.source === 'gps' ? { lat: last.center.lat, lng: last.center.lng } : null;
