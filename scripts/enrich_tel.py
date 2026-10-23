@@ -46,6 +46,12 @@ def pick_tel(common: dict | None, intro: dict | None) -> str:
     return ""
 
 
+def _scrub(error, api_key: str) -> str:
+    """오류 메시지(요청 URL 포함)에서 API 키를 가린다."""
+    text = str(error)
+    return text.replace(api_key, "***") if api_key else text
+
+
 class QuotaExceeded(RuntimeError):
     pass
 
@@ -116,11 +122,11 @@ def main(argv=None) -> int:
         try:
             tel = fetch_tel(settings.tour_api_key, cid, str(item["contenttypeid"]))
         except QuotaExceeded as e:
-            print(f"일일 호출 한도 초과로 중단합니다. 내일 다시 실행하면 이어집니다. ({e})")
+            print(f"일일 호출 한도 초과로 중단합니다. 내일 다시 실행하면 이어집니다. ({_scrub(e, settings.tour_api_key)})")
             break
         except Exception as e:  # 실패한 건은 저장하지 않아 다음 실행 때 다시 시도
             failed += 1
-            print(f"실패 {cid} {item.get('title')}: {e}")
+            print(f"실패 {cid} {item.get('title')}: {_scrub(e, settings.tour_api_key)}")
             continue
         enriched[cid] = {"tel": tel}
         out.write_text(json.dumps(enriched, ensure_ascii=False, indent=1), encoding="utf-8")
