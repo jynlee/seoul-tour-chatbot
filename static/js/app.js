@@ -32,7 +32,7 @@ function saveSession(id) {
 
 // ---------- 결과 화면 뼈대 ----------
 function buildResult() {
-  $('#result').innerHTML = '<div class="top"><span class="brand">🗺️ 서울 여행 친구</span>'
+  $('#result').innerHTML = '<div class="top"><span class="brand"><span class="brand-ico" aria-hidden="true">🗺️</span><span class="brand-name">서울 여행 친구</span></span>'
     + '<button type="button" class="toggle" id="toggle" hidden>▾ 지도 접기</button></div>'
     + '<div class="map" id="map" hidden></div>'
     + '<button type="button" class="fold" id="fold" hidden></button>'
