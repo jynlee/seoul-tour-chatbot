@@ -25,3 +25,68 @@ SMALL_PLACES = [
 @pytest.fixture
 def small_catalog():
     return {p.id: p for p in SMALL_PLACES}
+
+
+class FakeEmbedder:
+    def __init__(self):
+        self.calls = []
+
+    def encode(self, text):
+        self.calls.append(text)
+        return [0.0] * 768
+
+
+class FakeSearcher:
+    """카탈로그에서 type/cat3 조건에 맞는 장소를 카탈로그 순서대로(점수 내림차순) 돌려준다.
+
+    scores: {place_id: score}를 주면 그 점수로 정렬. fail=True면 SearchUnavailable.
+    """
+
+    def __init__(self, catalog, scores=None, fail=False):
+        self.catalog = catalog
+        self.scores = scores or {}
+        self.fail = fail
+        self.calls = []
+
+    def knn(self, vector, content_types, cat3, k):
+        from app.search import SearchUnavailable
+
+        self.calls.append({"content_types": set(content_types), "cat3": cat3, "k": k})
+        if self.fail:
+            raise SearchUnavailable("가짜 검색 서버 꺼짐")
+        hits = []
+        n = len(self.catalog)
+        for i, p in enumerate(self.catalog.values()):
+            if p.content_type not in content_types:
+                continue
+            if cat3 and p.cat3 != cat3:
+                continue
+            hits.append((p.id, self.scores.get(p.id, 1.0 - i / (n + 1))))
+        hits.sort(key=lambda h: -h[1])
+        return hits[:k]
+
+    def ping(self):
+        return not self.fail
+
+
+class FakeLLM:
+    def __init__(self, answer="가짜 답변이에요.", fail=False):
+        self.answer = answer
+        self.fail = fail
+        self.prompts = []
+
+    def generate(self, prompt):
+        from app.llm import LLMUnavailable
+
+        self.prompts.append(prompt)
+        if self.fail:
+            raise LLMUnavailable("가짜 LLM 꺼짐")
+        return self.answer
+
+    def ping(self):
+        return not self.fail
+
+
+@pytest.fixture
+def fake_embedder():
+    return FakeEmbedder()
