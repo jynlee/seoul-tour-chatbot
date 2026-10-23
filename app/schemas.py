@@ -10,7 +10,7 @@ class Location(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    session_id: str | None = None
+    session_id: str | None = Field(default=None, max_length=64)  # chat_message.session_id VARCHAR(64)
     message: str = Field(min_length=1, max_length=500)
     location: Location | None = None
     selected_place_id: str | None = None
