@@ -63,6 +63,7 @@
 ## ⑦ 팀원별 작업 로그 (컨텍스트 노트)
 명단(agentId): 리드가 팀원을 띄운 뒤 기록.
 - 팀원2 frontend: `a3f8272f943c570fa` (팀원1이 리드에게 받아 기록)
+- 팀원3 qa: `a3b7fc5a951212262` (팀원1이 리드에게 받아 기록)
 
 ### 리드
 - T0 완료: `app/config.py`(Settings·load_settings·ConfigError), `app/schemas.py`, `pytest.ini`(integration 마커), `requirements.txt`(설치 확인됨), `.env.example`, `data/seoul_tour.json`(원본 복사, 수정 금지).
