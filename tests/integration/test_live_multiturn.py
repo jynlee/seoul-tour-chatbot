@@ -191,3 +191,23 @@ def test_live_qa5_qa6_out_of_range_and_no_target(live):
     t2 = Talk(client, sessions)
     r = t2.say("거기 어디야?")
     assert r["answer"] == CLARIFY_ANSWER and r["places"] == []
+
+
+@pytest.mark.parametrize("message", ["강서구에 산책할만한 곳 알려줘", "강서구 공원 추천해줘"])
+def test_live_gu_nature_topic(live, message):
+    """51b8c0d: 구 기준점은 구 전체에서, 산책·공원은 맞는 곳을 앞으로 → 1번이 강서습지생태공원."""
+    client, _, deps, sessions = live
+    t = Talk(client, sessions)
+    r = t.say(message)
+    assert r["center"]["source"] == "gu" and r["center"]["label"] == "강서구"
+    assert r["places"][0]["title"] == "강서습지생태공원"
+    assert {deps.catalog[i].gu for i in ids(r)} == {"강서구"}
+
+
+def test_live_topic_missing_and_hangang_food(live):
+    client, _, _, sessions = live
+    r = Talk(client, sessions).say("금천구 산책할 곳")
+    assert r["places"] and r["center"]["label"] == "금천구"
+    assert any(w in r["answer"] for w in ("없", "못 찾", "어려", "아쉽")), r["answer"]  # 솔직히 안내
+    r = Talk(client, sessions).say("한강 근처 맛집")
+    assert r["places"] and all(p["kind"] == "food" for p in r["places"])

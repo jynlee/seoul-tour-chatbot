@@ -193,6 +193,23 @@ try {
   check('QA-6', '첫 메시지 "거기 어디야?" → 되묻기, 핀 없음', zb.text.includes('어느 곳을 말씀하시는지') && (await pins(z)).length === 0, zb.text);
   await z.close();
 
+  // ---------------- 구 전체·산책 주제 (51b8c0d)
+  const w = await freshPage(ctx);
+  const wb = await send(w, '강서구 공원 추천해줘');
+  const wa = await apiPlaces(w);
+  const wchips = await chipTitles(w);
+  const foldW = await foldText(w);
+  await w.eval(`document.querySelector('#map .pin[data-id="${wa[0].id}"]').click()`);
+  await sleep(300);
+  const wcard = await w.eval(`document.querySelector('#card').innerText`);
+  await w.shot(`${SHOTS}/b89-12-gu-park.png`);
+  check('GU-1', '"강서구 공원 추천해줘" → 강서구 기준, 1번 칩·핀이 강서습지생태공원', wa[0]?.title === '강서습지생태공원' && wchips[0]?.includes('강서습지생태공원') && foldW.includes('강서구'),
+    `${foldW.replace(/\n/g, ' ')} / ${wchips.join(' | ')} / 카드: ${wcard.replace(/\n/g, ' / ')} / ${wb.text}`);
+  const wb2 = await send(w, '금천구 산책할 곳');
+  await w.shot(`${SHOTS}/b89-13-topic-missing.png`);
+  check('GU-2', '"금천구 산책할 곳" → 맞는 곳이 없다고 솔직히 안내 + 핀', /없|못 찾|어려|아쉽/.test(wb2.text) && (await pins(w)).length > 0, wb2.text);
+  await w.close();
+
   // ---------------- 대상 없음 → 되묻기
   const c = await freshPage(ctx);
   const cb = await send(c, '주차 가능해?');

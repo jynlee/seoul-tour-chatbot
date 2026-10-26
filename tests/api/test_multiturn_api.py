@@ -10,7 +10,8 @@ from fastapi.testclient import TestClient
 from app.catalog import CAFE_CAT3, load_catalog
 from app.chat import Deps
 from app.history import InMemoryHistoryRepo
-from app.llm import CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE
+from app.intent import matches_topic
+from app.llm import CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE
 from app.main import create_app
 from tests.conftest import SMALL_PLACES, FakeEmbedder, FakeLLM, FakeSearcher
 
@@ -394,6 +395,93 @@ def test_short_title_used_as_place_is_center(real_catalog):
     api = Api(real_catalog)
     r = api.say("기후 근처 카페")
     assert r["center"]["label"] == "기후" and r["center"]["source"] == "place"
+
+
+# ---------------------------------------------------------------- 구 전체·관광 세부 주제 (팀원1 51b8c0d)
+
+def gu_of(catalog, body):
+    return {catalog[p["id"]].gu for p in body["places"]}
+
+
+@pytest.mark.parametrize("message", ["강서구에 산책할만한 곳 알려줘", "강서구 공원 추천해줘"])
+def test_gu_wide_nature_topic_first(real_catalog, message):
+    """구 기준점이면 구 전체에서 고르고(1.5km 제한 없음), 산책·공원에 맞는 곳이 1번."""
+    api = Api(real_catalog)
+    r = api.say(message)
+    assert r["center"]["source"] == "gu" and r["center"]["label"] == "강서구"
+    assert r["places"] and gu_of(real_catalog, r) == {"강서구"}
+    first = r["places"][0]
+    assert matches_topic(first["category"], first["title"], "nature"), first
+    # 반경이 아니라 구 전체 → 장소 줄에 '기준점에서 조금 멂'·도보 표시 없음, 구 안이라는 규칙
+    prompt = api.last_prompt()
+    assert "/ 기준점에서 조금 멂" not in prompt and "/ 도보 " not in prompt
+    assert "강서구 안에서 고른 곳" in prompt
+
+
+def test_gu_wide_may_exceed_radius(real_catalog):
+    api = Api(real_catalog)
+    r = api.say("종로 관광지")
+    assert gu_of(real_catalog, r) == {"종로구"}
+    others = Api(real_catalog)
+    seen = set(ids(r))
+    far_seen = any(p["distance_m"] > 1500 for p in r["places"])
+    for _ in range(3):  # 구 전체라 '다른 데 더'를 해도 같은 구 안에서 계속 나옴
+        r = others.say("종로 관광지") if others.sid is None else others.say("다른 데 더 추천해줘")
+        assert gu_of(real_catalog, r) <= {"종로구"}
+        far_seen = far_seen or any(p["distance_m"] > 1500 for p in r["places"])
+    assert far_seen
+
+
+def test_gu_wide_more_has_no_far_notice(real_catalog):
+    """구 기준점의 '다른 데 더'는 결과가 모두 1.5km 밖이어도 '근처(1.5km 안)에는 없어서' 안내를 붙이지 않음."""
+    api = Api(real_catalog, llm=FakeLLM(fail=True))
+    api.say("종로 관광지")
+    for _ in range(4):
+        r = api.say("다른 데 더 추천해줘")
+        if not r["places"]:
+            break
+        assert "1.5km 안" not in r["answer"]
+        assert r["center"]["label"] == "종로구"
+
+
+def test_topic_missing_notice(real_catalog):
+    """'금천구 산책할 곳' — 맞는 곳이 없으면 솔직히 안내 (LLM 다운 템플릿)."""
+    api = Api(real_catalog, llm=FakeLLM(fail=True))
+    r = api.say("금천구 산책할 곳")
+    assert r["places"]
+    assert not any(matches_topic(p["category"], p["title"], "nature") for p in r["places"])
+    assert r["answer"].startswith(TOPIC_MISSING_NOTICE.format(where="금천구에서 ", topic="산책·자연"))
+
+
+def test_topic_missing_notice_added_when_llm_omits(real_catalog):
+    api = Api(real_catalog, llm=FakeLLM("금천구 관광지를 골라봤어요."))
+    r = api.say("금천구 산책할 곳")
+    assert r["answer"] == TOPIC_MISSING_NOTICE.format(where="금천구에서 ", topic="산책·자연") + " 금천구 관광지를 골라봤어요."
+
+
+def test_hangang_food_is_food_only(real_catalog):
+    """'한강 근처 맛집'의 한강은 산책 주제가 아님 → 음식점만."""
+    api = Api(real_catalog)
+    r = api.say("한강 근처 맛집")
+    assert r["places"] and all(p["kind"] == "food" for p in r["places"])
+
+
+def test_topic_carried_to_more(real_catalog):
+    """'강서구 공원' → '다른 데 더': 구·관광 유지, 이전과 안 겹침."""
+    api = Api(real_catalog)
+    r1 = api.say("강서구 공원 추천해줘")
+    r2 = api.say("다른 데 더 추천해줘")
+    if r2["places"]:
+        assert r2["center"]["label"] == "강서구"
+        assert all(p["kind"] == "tour" for p in r2["places"])
+        assert not set(ids(r2)) & set(ids(r1))
+
+
+def test_gunggeum_does_not_trigger_history_topic(real_catalog):
+    api = Api(real_catalog)
+    r = api.say("궁금한 게 있는데 종로 관광지 추천해줘")
+    assert r["center"]["label"] == "종로구" and all(p["kind"] == "tour" for p in r["places"])
+    assert "질문 주제는" not in api.last_prompt()  # '궁금'의 '궁'으로 역사 주제가 잡히지 않음
 
 
 # ---------------------------------------------------------------- /api/history 형식

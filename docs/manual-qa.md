@@ -78,7 +78,7 @@ RF = 계획서 Review Focus.
 # B8·B9 화면 시나리오 점검 (장소 정보 질문·멀티턴)
 
 - 점검일: 2026-10-26 · 점검: 팀원3(QA)
-- 대상: `feat/qa` (feat/backend b101c72 병합 — B8·B9, B7 574/574, 개선 3개, QA-4~7 수정 포함). 1차 점검은 9f38d69 기준(14항목 통과, QA-4~7 발견)
+- 대상: `feat/qa` (feat/backend 51b8c0d 병합 — B8·B9, B7 574/574, 개선 3개, QA-4~7 수정, 구 전체 고르기·관광 세부 주제 포함). 1차 점검은 9f38d69 기준(14항목 통과, QA-4~7 발견), 2차는 b101c72(17항목)
 - 환경: 위와 같음(헤드리스 Chrome, iPhone 14 Pro 393x852, 실서비스). 서버는 포트 **8012** 하나(정상).
 - 자동 실행: `scripts/qa_mobile/run_b89.mjs`
 
@@ -90,7 +90,7 @@ node scripts/qa_mobile/run_b89.mjs <스크린샷 폴더> http://localhost:8012
 끝나면 `<스크린샷 폴더>/results.json`의 `sessions`를 `MySQLHistoryRepo.delete_session()`으로 지운다(완료).
 스크린샷: `C:\Users\SMT03\AppData\Local\Temp\claude\C--Users-SMT03-SeoulTourChatbot\1f8c78e6-b194-4613-a7ad-8121fad70e0f\scratchpad\shots\b89-*.png`
 
-## 결과: 17개 항목 모두 통과 (b101c72 재점검)
+## 결과: 19개 항목 모두 통과 (51b8c0d 재점검)
 
 | # | 항목 | 결과 | 스크린샷 | 확인한 내용 |
 |---|---|---|---|---|
@@ -107,9 +107,11 @@ node scripts/qa_mobile/run_b89.mjs <스크린샷 폴더> http://localhost:8012
 | B8-3 | 이름으로 정보 질문·정보 없음 | ✅ | `b89-07-info-missing.png` | "각시보쌈 — 주차 정보는 없어요. 전화(02-333-8786)로 확인해 보세요." 지어내지 않음, 핀 그대로 (B7 완료로 고려삼계탕은 주차 '가능'이 생겨 대상 교체) |
 | B8-4 | 핀 선택 후 "거기 전화번호 알려줘" | ✅ | `b89-08-info-selected.png` | `selected_place_id` 전송, 고른 장소(개화) 설명 |
 | B9-6 | 회귀: 정보 질문 뒤 "거기 근처 카페 있어?" | ✅ | `b89-09-near-cafe.png` | "개화 근처 · 추천 3곳" ☕ 핀 |
-| QA-4 | "종로 역사 관광지" → "아까 그 궁 주차돼?" | ✅ | — | 목록(가회동성당·바라캇 서울·광화문·건청궁·광통교) 중 건청궁 설명, 핀 그대로 |
+| QA-4 | "종로 역사 관광지" → "아까 그 궁 주차돼?" | ✅ | — | 이름에 '궁'이 든 첫 장소 설명, 핀 그대로 (b101c72: 가회동성당·…·건청궁 → 건청궁 / 51b8c0d 구 전체 고르기 후: 광화문·경희궁 흥화문·… → 경희궁 흥화문) |
 | QA-5 | 5곳 목록 뒤 "6번째 거 어디야?" | ✅ | `b89-11-out-of-range.png` | "목록에는 5곳까지 있어요. 몇 번째 장소인지 다시 알려 주세요.", 핀 그대로 |
 | QA-6 | 첫 메시지 "거기 어디야?" | ✅ | — | 되묻기, 핀 없음 |
+| GU-1 | "강서구 공원 추천해줘" | ✅ | `b89-12-gu-park.png` | 강서구 기준, 1번 칩·핀 🌳 강서습지생태공원 |
+| GU-2 | "금천구 산책할 곳" | ✅ | `b89-13-topic-missing.png` | "아쉽게도 금천구에는 산책이나 자연에 딱 맞는 곳은 없어요. 대신…" + 핀 |
 | B8-5 | 대상 없는 "주차 가능해?" | ✅ | `b89-10-clarify.png` | 되묻기 말풍선(오류 아님), 핀 없음 |
 
 LLM 다운 시 detail 템플릿은 화면 대신 통합 테스트로 확인(`tests/integration/test_live_multiturn.py::test_live_info_llm_down_uses_detail`: "가회동성당 — 주차: 가능.").
@@ -121,6 +123,7 @@ LLM 다운 시 detail 템플릿은 화면 대신 통합 테스트로 확인(`tes
 | QA-4 | "종로 관광지" 뒤 "아까 그 궁 주차돼?" → 이름에 '궁'이 든 건청궁이 아니라 같은 분류(역사관광지)의 첫 장소 가회동성당을 설명 | 팀원1 | 733af89 수정 → 재확인 통과 |
 | QA-5 | 목록 범위를 넘는 순서("6번째 거 어디야?", 5곳 목록) → 같은 목록을 다시 추천 | 팀원1 | 733af89 수정 → 재확인 통과 |
 | QA-6 | 가리킬 장소가 없는 "거기 어디야?" → 기준점 없는 아무 관광지 5곳 추천 | 팀원1 | 733af89 수정 → 재확인 통과 |
+| QA-8 | (UX) 구 기준점일 때 카드 "🚶 강서구에서 약 40분"·칩 "40분"·요약 바 "강서구 근처" — 구 중심점에서 잰 거리라 뜻이 없음(구 전체에서 고르므로 40~75분 흔함) | 팀원1(+리드·팀원2 계약 판단) | 보고함 (제안: gu일 때 distance/walk null 또는 프론트에서 숨김) |
 | QA-7 | (경미) 두 턴 전 목록을 가리키는 "아까 그 식당 몇 시에 열어?" → 되묻기(직전 목록만 봄) | 팀원1 | 733af89 수정 → 재확인 통과(단위 테스트 `test_qa7_earlier_list_reference`) |
 
 ## 주의 (B8·B9)
@@ -131,6 +134,6 @@ LLM 다운 시 detail 템플릿은 화면 대신 통합 테스트로 확인(`tes
 
 ## 자동 테스트 결과 (B8·B9 추가 후)
 
-- `pytest -m "not integration"`: 204 통과 (QA 신규 `tests/api/test_multiturn_api.py` 35)
-- `pytest -m integration`: 30 통과 (QA 신규 `tests/integration/test_live_multiturn.py` 10)
+- `pytest -m "not integration"`: 227 통과 (QA 신규 `tests/api/test_multiturn_api.py` 44)
+- `pytest -m integration`: 33 통과 (QA 신규 `tests/integration/test_live_multiturn.py` 13)
 - `node --test "tests/js/*.test.mjs"`: 37 통과
