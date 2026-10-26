@@ -232,6 +232,7 @@ def test_gangseo_walk_and_park(real_catalog):
         assert r.center.label == "강서구", q
         assert r.places[0].title == "강서습지생태공원", q
         assert all(real_catalog[p.id].gu == "강서구" for p in r.places), q
+        assert all(p.distance_m is None and p.walk_min is None for p in r.places), q  # QA-8
 
 
 def test_topic_missing_says_so(real_catalog):
@@ -249,6 +250,7 @@ def test_topic_carried_to_more_request(real_catalog):
     s = Session(real_catalog)
     r1 = s.say("강서구 공원 추천해줘")
     r2 = s.say("다른 데 더 추천해줘")
-    assert r2.center.label == "강서구"
+    assert (r2.center.source, r2.center.label) == ("gu", "강서구")
+    assert all(p.distance_m is None and p.walk_min is None for p in r2.places)
     assert not set(_titles(r2)) & set(_titles(r1))
     assert "산책·자연" in s.deps.llm.prompts[-1]  # 직전 주제를 이어받음

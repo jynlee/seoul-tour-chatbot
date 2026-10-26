@@ -113,7 +113,8 @@ def test_gu_center_topic_boost_first(fake_embedder):
     for q in ("강서구에 산책할만한 곳 알려줘", "강서구 공원 추천해줘"):
         rec = recommend(q, detect_intent(q), GANGSEO, FakeSearcher(catalog), fake_embedder, catalog)
         assert rec.places[0].title == "강서습지생태공원", q
-        assert rec.places[0].distance_m > 1500  # 거리는 표시용으로 그대로
+        # QA-8: 구 중심(평균 좌표)에서 잰 거리는 의미가 없어 null
+        assert all(p.distance_m is None and p.walk_min is None for p in rec.places)
         assert rec.topic_missing is False
 
 
@@ -136,3 +137,10 @@ def test_topic_missing_flag(fake_embedder):
     catalog = {k: v for k, v in _gangseo_catalog().items() if k not in ("w1", "y1")}
     rec = recommend("강서구 공원", detect_intent("강서구 공원"), GANGSEO, FakeSearcher(catalog), fake_embedder, catalog)
     assert rec.places and rec.topic_missing is True
+
+
+def test_gu_history_center_distance_null(fake_embedder):
+    catalog = _gangseo_catalog()
+    center = Center(lat=GANGSEO.lat, lng=GANGSEO.lng, label="강서구", source="history")
+    rec = recommend("다른 데 더", detect_intent("관광지"), center, FakeSearcher(catalog), fake_embedder, catalog)
+    assert rec.gu_wide and all(p.distance_m is None and p.walk_min is None for p in rec.places)

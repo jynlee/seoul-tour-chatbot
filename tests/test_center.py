@@ -128,3 +128,11 @@ def test_short_title_as_common_word_is_ignored(small_catalog):
     assert _resolve(catalog, "요즘 서울 기후 어때?") is None
     assert _resolve(catalog, "골목길목 분위기 좋은 카페") is None
     assert _resolve(catalog, "길목마다 맛집이 있는 곳") is None
+
+
+def test_history_gu_stays_gu(small_catalog):
+    # 구 이름을 이어받은 기준점은 source "gu" 그대로 (프론트 요약 바 "강서구 · 추천 5곳"과 일치)
+    for src in ("gu", "history"):
+        last_center = CenterOut(lat=37.56, lng=126.83, label="강서구", source=src)
+        c = _resolve(small_catalog, "다른 데 더 추천해줘", last_center=last_center)
+        assert (c.source, c.label) == ("gu", "강서구")
