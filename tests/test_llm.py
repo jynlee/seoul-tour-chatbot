@@ -77,3 +77,14 @@ def test_mentions_missing():
     assert mentions_missing("산책이나 자연 위주의 장소는 찾기 어려워요.")
     assert mentions_missing("아쉽게도 공원은 없지만")
     assert not mentions_missing("강서구에 있는 곳들이에요.")
+
+
+def test_gu_wide_prompt_has_no_distance_rules():
+    from app.llm import build_prompt
+    from app.schemas import PlaceOut
+
+    p = PlaceOut(id="1", title="강서습지생태공원", kind="tour", category="자연관광지", addr="서울 강서구", tel="",
+                 lat=37.58, lng=126.81, image="", distance_m=2670, walk_min=40)
+    prompt = build_prompt("강서구 공원", [], [p], "강서구", None, gu_wide=True)
+    assert "조금 멂" not in prompt and "도보" not in prompt
+    assert "조금 멂" in build_prompt("마곡 공원", [], [p], "마곡", None)

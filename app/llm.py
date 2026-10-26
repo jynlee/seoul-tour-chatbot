@@ -56,7 +56,8 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
     ]
     if center_label:
         rules.append(f"위치를 말할 때는 [기준점]인 '{center_label}'만 쓰고, 이전 대화에 나온 다른 지역 이름을 쓰지 말 것")
-        rules.append("'기준점에서 조금 멂'이라고 표시된 장소는 '근처'라고 하지 말고 조금 떨어져 있다고 말할 것")
+        if not gu_wide:  # 구 결과는 장소 줄에 거리 표시가 없음
+            rules.append("'기준점에서 조금 멂'이라고 표시된 장소는 '근처'라고 하지 말고 조금 떨어져 있다고 말할 것")
     else:
         rules.append("기준점이 없으므로 '근처'·'주변'이라는 말이나 특정 동네·지역 이름을 쓰지 말 것")
         rules.append("답변 끝에 현재 위치(📍)를 켜거나 지역 이름을 말해 주면 더 가까운 곳을 찾아 준다고 안내할 것")
