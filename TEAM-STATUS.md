@@ -57,7 +57,9 @@
   - 기준점 없는 검색(예: "이번 주 축제")은 `center:null`, `distance_m/walk_min:null`.
 - 2026-10-23 B8·B9(팀원1): **API 필드 변경 없음.** 장소 정보 질문("고려삼계탕 주차 돼?", "두 번째 거기 어디야?")·되묻기·"다른 데 더"가 없을 때의 응답은 `places: []`, `center: null` → 프론트는 "고마워!"처럼 지도·핀 유지. 단 `/api/history`에는 이 봇 메시지가 `center:{source:"place", label:장소이름}`, `places:[]`로 저장됨(다음 "거기"가 그 장소를 가리키게 하려는 용도). 프론트 복원은 "places가 있는 마지막 봇 메시지" 기준이라 영향 없음.
 - 2026-10-26 구 기준점·관광 세부 주제(팀원1): **API 필드 변경 없음.** 기준점 `source:"gu"`(또는 구를 이어받은 `history`)이면 결과가 그 구 전체에서 관련도순이라 `distance_m`이 1500을 넘을 수 있고 **거리순이 아님**(첫 번째가 가장 관련 있는 곳). area/place/gps는 기존대로 반경 1.5km·주제 맞는 곳 먼저, 그다음 거리순.
-- 2026-10-26 QA-8 결정(리드) — **값 규칙 보충, 필드 변경 없음:** 기준점이 구(`center.source:"gu"`, 그리고 구 이름을 이어받은 `source:"history"`·label=구 이름)이면 `places`의 `distance_m`·`walk_min`은 **null**(구 중심 평균 좌표에서 잰 거리라 의미 없음). `center`는 그대로 보냄. 즉 "center가 있어도 distance가 null일 수 있음". 프롬프트에도 거리·도보 표시 없음.
+- 2026-10-26 QA-8 결정(리드, A안) — **값 규칙 보충, 필드 변경 없음:**
+  1. 기준점이 구(`center.source:"gu"`)이면 `places`의 `distance_m`·`walk_min`은 **null**(구 중심 평균 좌표에서 잰 거리라 의미 없음). `center`는 그대로 보냄 → "center가 있어도 distance가 null일 수 있음". 프롬프트에도 거리·도보 표시 없음. (프론트 view.js는 `Number.isFinite(p.walk_min)`일 때만 도보 표시 → 안전, 리드 확인)
+  2. 구 기준점을 이어받은 턴("다른 데 더", "카페는?" 등, 직전 center가 구)은 `source:"history"`가 아니라 **`source:"gu"`**(label=구 이름)로 나가고 거리 null — 프론트 요약 바의 gu 처리("강서구 · 추천 5곳")와 일치. 구가 아닌 직전 기준점을 이어받으면 기존대로 `history`.
 - 2026-10-23 QA-1 수정(팀원1, 팀원3 리포트): `ChatRequest.session_id`에 **최대 64자** 제한 추가 → 넘으면 422. (`chat_message.session_id`가 VARCHAR(64)라 긴 id는 기록이 조용히 안 남던 문제.) 프론트는 UUID(36자)라 영향 없음.
 
 ## ⑤ 결정 사항 로그

@@ -190,7 +190,9 @@ def resolve_center(
 
     # ⑦ 직전 기준점
     if last_center is not None:
-        return Center(lat=last_center.lat, lng=last_center.lng, label=last_center.label, source="history")
+        # 구 기준점을 이어받으면 source 도 "gu" 그대로 (구 전체에서 고르고 거리는 null — 프론트 요약 바와 일치)
+        source = "gu" if last_center.source == "gu" or last_center.label in SEOUL_GU else "history"
+        return Center(lat=last_center.lat, lng=last_center.lng, label=last_center.label, source=source)
 
     # ⑧ 없음
     return None
