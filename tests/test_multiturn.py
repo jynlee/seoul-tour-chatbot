@@ -222,3 +222,33 @@ def test_qa7_earlier_list_reference(real_catalog):
     # 이전 맛집 목록 중 한 곳(이름에 '식당'이 든 곳이 있으면 그곳)에 대한 답
     assert any(r.answer.startswith(f"{p.title} —") for p in r1.places)
     assert r.places == []
+
+
+# ---------------- 구 기준점 + 산책·공원 의도 (리드 재현) ----------------
+
+def test_gangseo_walk_and_park(real_catalog):
+    for q in ("강서구에 산책할만한 곳 알려줘", "강서구 공원 추천해줘"):
+        r = Session(real_catalog).say(q)
+        assert r.center.label == "강서구", q
+        assert r.places[0].title == "강서습지생태공원", q
+        assert all(real_catalog[p.id].gu == "강서구" for p in r.places), q
+
+
+def test_topic_missing_says_so(real_catalog):
+    # 금천구에는 자연·공원 관광지가 없음 → 솔직히 말하고 비슷한 관광지
+    s = Session(real_catalog, llm=FakeLLM(fail=True))
+    r = s.say("금천구 산책할 곳 추천해줘")
+    assert r.places and all(p.kind == "tour" for p in r.places)
+    assert r.answer.startswith("금천구에서 산책·자연에 딱 맞는 곳은 못 찾아서 비슷한 관광지를 골랐어요.")
+    s2 = Session(real_catalog)
+    s2.say("금천구 산책할 곳 추천해줘")
+    assert "산책·자연" in s2.deps.llm.prompts[-1]
+
+
+def test_topic_carried_to_more_request(real_catalog):
+    s = Session(real_catalog)
+    r1 = s.say("강서구 공원 추천해줘")
+    r2 = s.say("다른 데 더 추천해줘")
+    assert r2.center.label == "강서구"
+    assert not set(_titles(r2)) & set(_titles(r1))
+    assert "산책·자연" in s.deps.llm.prompts[-1]  # 직전 주제를 이어받음

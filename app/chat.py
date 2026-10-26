@@ -18,10 +18,11 @@ from app.dialog import (
     asked_fields, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
     intent_from_places, is_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference,
 )
-from app.intent import CASUAL_RESPONSES, detect_intent
+from app.catalog import EVENT_TYPE
+from app.intent import CASUAL_RESPONSES, TOUR_TOPICS, TOUR_TYPES, detect_intent
 from app.llm import (
-    CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, LLMUnavailable, all_far, build_info_prompt, build_prompt,
-    info_template_answer, mentions_far, template_answer,
+    CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE, LLMUnavailable,
+    all_far, build_info_prompt, build_prompt, info_template_answer, mentions_far, mentions_missing, template_answer,
 )
 from app.recommend import recommend
 from app.schemas import CenterOut, ChatRequest, ChatResponse
@@ -94,6 +95,9 @@ class ChatService:
         # 3) 추천
         if not intent.has_category and last_places:
             intent = intent_from_places(last_places, catalog) or intent
+            # "다른 데 더"·"거기 근처는?"도 직전 관광 세부 주제(산책 등)를 이어받음
+            if intent.content_types and intent.content_types <= TOUR_TYPES | {EVENT_TYPE}:
+                intent.topic = self._last_topic(messages)
         if req.location is None and ref is not None and not has_named_area(msg, catalog):
             p = ref.place
             center = Center(lat=p.lat, lng=p.lng, label=p.title, source="place", place_id=p.id)
@@ -110,20 +114,40 @@ class ChatService:
             return self._reply(sid, msg, NO_MORE_ANSWER.format(label=f"{label} 근처" if label else "이"))
 
         # "다른 데 더"인데 남은 곳이 모두 반경 밖이면 멀다는 사실을 꼭 알린다 (LLM이 빠뜨리면 안내 문장을 앞에 붙임)
-        far_notice = FAR_MORE_NOTICE.format(label=label) if more and label and all_far(rec.places) else None
+        far = more and label and not rec.gu_wide and all_far(rec.places)
+        far_notice = FAR_MORE_NOTICE.format(label=label) if far else None
+        # 산책 등 세부 주제에 맞는 곳이 하나도 없으면 솔직히 말한다 (같은 방식)
+        topic_label = TOUR_TOPICS[intent.topic].label if intent.topic else None
+        missing_notice = (TOPIC_MISSING_NOTICE.format(where=f"{label}에서 " if label else "", topic=topic_label)
+                          if rec.topic_missing else None)
         try:
             answer = self.deps.llm.generate(
                 build_prompt(msg, history_texts, rec.places, label, rec.fallback_note, more=more,
-                             far_notice=far_notice))
+                             far_notice=far_notice, topic_label=topic_label, topic_missing=rec.topic_missing,
+                             gu_wide=rec.gu_wide))
             if far_notice and not mentions_far(answer):
                 answer = f"{far_notice} {answer}"
+            if missing_notice and not mentions_missing(answer):
+                answer = f"{missing_notice} {answer}"
         except LLMUnavailable:
             answer = template_answer(rec.places, label, far=far_notice is not None)
             if rec.fallback_note and rec.places:
                 answer = f"{answer} ({rec.fallback_note})"
             if far_notice:
                 answer = f"{far_notice} {answer}"
+            if missing_notice:
+                answer = f"{missing_notice} {answer}"
         return self._reply(sid, msg, answer, center=center_out, places=rec.places)
+
+    @staticmethod
+    def _last_topic(messages) -> str | None:
+        """마지막 추천을 만든 사용자 질문의 관광 세부 주제."""
+        for i in range(len(messages) - 1, 0, -1):
+            m = messages[i]
+            if m.role == "assistant" and m.places:
+                prev = messages[i - 1]
+                return detect_intent(prev.message).topic if prev.role == "user" else None
+        return None
 
     @staticmethod
     def _shown_ids(messages, label) -> set[str]:
