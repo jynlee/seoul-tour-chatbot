@@ -10,7 +10,7 @@ import uuid
 import pytest
 
 from app.catalog import CAFE_CAT3
-from app.llm import CLARIFY_ANSWER
+from app.llm import CLARIFY_ANSWER, ORDINAL_OUT_OF_RANGE
 from tests.conftest import FakeLLM
 
 pytestmark = pytest.mark.integration
@@ -100,14 +100,25 @@ def test_live_session2_gangnam(live):
 
 
 def test_live_info_by_name_missing_field(live):
-    """실데이터 고려삼계탕은 상세 정보가 없음 → 지어내지 않고 전화 안내(LLM 호출 없이 고정 문구)."""
+    """주차 정보가 없는 음식점(B7 574/574 기준 각시보쌈) → 지어내지 않고 전화 안내(LLM 호출 없이 고정 문구)."""
     client, _, deps, sessions = live
-    gs = next(p for p in deps.catalog.values() if p.title == "고려삼계탕")
-    assert not gs.detail.get("parking") and gs.tel
+    p = next(p for p in deps.catalog.values() if p.title == "각시보쌈")
+    assert not p.detail.get("parking") and p.tel
+    t = Talk(client, sessions)
+    r = t.say("각시보쌈 주차 가능해?")
+    assert r["answer"] == f"각시보쌈 — 주차 정보는 없어요. 전화({p.tel})로 확인해 보세요."
+    assert_place_info(t, r, "각시보쌈")
+
+
+def test_live_info_by_name_with_value(live):
+    """'고려삼계탕 주차 가능해?' — B7 완료 후 실데이터 주차 '가능'. 실제 LLM 답이 그 값과 어긋나지 않는지."""
+    client, _, deps, sessions = live
+    p = next(p for p in deps.catalog.values() if p.title == "고려삼계탕")
+    assert p.detail.get("parking") == "가능"
     t = Talk(client, sessions)
     r = t.say("고려삼계탕 주차 가능해?")
-    assert r["answer"] == f"고려삼계탕 — 주차 정보는 없어요. 전화({gs.tel})로 확인해 보세요."
     assert_place_info(t, r, "고려삼계탕")
+    assert "주차" in r["answer"] and "불가" not in r["answer"] and "정보는 없" not in r["answer"]
 
 
 def test_live_info_demonstrative_selected_and_first(live):
@@ -154,3 +165,29 @@ def test_live_regression_near_cafe_after_info(live):
     r = t.say("거기 근처 카페 있어?")
     assert r["center"]["label"] == "고려삼계탕" and r["center"]["source"] == "place"
     assert r["places"] and all(deps.catalog[i].cat3 == CAFE_CAT3 for i in ids(r))
+
+
+def test_live_qa4_palace_reference(live):
+    """QA-4: 목록에 이름에 '궁'이 든 곳이 있으면 '아까 그 궁'은 그곳 (실측: 가회동성당·…·건청궁 순)."""
+    client, _, _, sessions = live
+    t = Talk(client, sessions)
+    r1 = t.say("종로 역사 관광지")
+    palaces = [p["title"] for p in r1["places"] if "궁" in p["title"]]
+    if not palaces:
+        pytest.skip(f"이번 검색 결과에 '궁'이 든 장소 없음: {[p['title'] for p in r1['places']]}")
+    r = t.say("아까 그 궁 주차돼?")
+    assert_place_info(t, r, palaces[0])
+
+
+def test_live_qa5_qa6_out_of_range_and_no_target(live):
+    client, _, _, sessions = live
+    t = Talk(client, sessions)
+    r1 = t.say("성수 카페")
+    n = len(r1["places"])
+    r = t.say(f"{n + 1}번째 거 어디야?")
+    assert r["answer"] == ORDINAL_OUT_OF_RANGE.format(n=n)
+    assert r["places"] == [] and r["center"] is None
+
+    t2 = Talk(client, sessions)
+    r = t2.say("거기 어디야?")
+    assert r["answer"] == CLARIFY_ANSWER and r["places"] == []

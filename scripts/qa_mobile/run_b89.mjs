@@ -147,10 +147,10 @@ try {
   const q = await freshPage(ctx);
   await send(q, '명동 맛집 추천해줘');
   const q1 = await pins(q);
-  const qb = await send(q, '고려삼계탕 주차 가능해?');
+  const qb = await send(q, '각시보쌈 주차 가능해?');  // B7 574/574 기준 주차 정보 없는 음식점
   await q.shot(`${SHOTS}/b89-07-info-missing.png`);
   check('B8-3', '이름으로 정보 질문, 정보 없음 → 지어내지 않고 전화 안내, 핀 그대로',
-    /^고려삼계탕 — 주차 정보는 없어요\. 전화\(.+\)로 확인해 보세요\.$/.test(qb.text) && ids(await pins(q)) === ids(q1), qb.text);
+    /^각시보쌈 — 주차 정보는 없어요\. 전화\(.+\)로 확인해 보세요\.$/.test(qb.text) && ids(await pins(q)) === ids(q1), qb.text);
 
   const chosen = q1[q1.length - 1];
   await q.eval(`document.querySelector('#map .pin[data-id="${chosen.id}"]').click()`);
@@ -171,6 +171,27 @@ try {
   check('B9-6', '회귀: 정보 질문 뒤 "거기 근처 카페" → 그 장소 기준 ☕ 핀', q3.length > 0 && q3.every((x) => x.emoji.includes('☕')) && foldQ.includes(`${chosen.title} 근처`),
     `${foldQ.replace(/\n/g, ' ')} / ${qb3.text.slice(0, 60)}`);
   await q.close();
+
+  // ---------------- QA-4·QA-5 재확인
+  const k = await freshPage(ctx);
+  await send(k, '종로 역사 관광지');
+  const ka = await apiPlaces(k);
+  const kp = await pins(k);
+  const palace = ka.find((x) => x.title.includes('궁'));
+  const kb = await send(k, '아까 그 궁 주차돼?');
+  const recK = await lastBotRecord(k);
+  check('QA-4', '"아까 그 궁" → 이름에 "궁"이 든 장소, 핀 그대로', palace && recK.center?.label === palace.title && ids(await pins(k)) === ids(kp),
+    `목록 ${ka.map((x) => x.title).join(', ')} / 설명 ${recK.center?.label} / ${kb.text}`);
+  const kb2 = await send(k, `${ka.length + 1}번째 거 어디야?`);
+  await k.shot(`${SHOTS}/b89-11-out-of-range.png`);
+  check('QA-5', '목록 범위 밖 순서 → "목록에는 N곳까지 있어요" 말풍선, 핀 그대로', kb2.text.startsWith(`목록에는 ${ka.length}곳까지 있어요`) && ids(await pins(k)) === ids(kp), kb2.text);
+  await k.close();
+
+  // ---------------- QA-6: 가리킬 장소 없는 "거기 어디야?"
+  const z = await freshPage(ctx);
+  const zb = await send(z, '거기 어디야?');
+  check('QA-6', '첫 메시지 "거기 어디야?" → 되묻기, 핀 없음', zb.text.includes('어느 곳을 말씀하시는지') && (await pins(z)).length === 0, zb.text);
+  await z.close();
 
   // ---------------- 대상 없음 → 되묻기
   const c = await freshPage(ctx);

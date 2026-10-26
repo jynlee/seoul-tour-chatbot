@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.catalog import CAFE_CAT3, load_catalog
 from app.chat import Deps
 from app.history import InMemoryHistoryRepo
-from app.llm import CLARIFY_ANSWER, NO_MORE_ANSWER
+from app.llm import CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE
 from app.main import create_app
 from tests.conftest import SMALL_PLACES, FakeEmbedder, FakeLLM, FakeSearcher
 
@@ -104,13 +104,38 @@ def test_session1_myeongdong_full_flow(real_catalog):
 
 
 def test_session1_more_template_uses_center_label(real_catalog):
-    """LLM 다운이어도 '다른 데 더' 답변의 지역명은 center.label."""
+    """LLM 다운이어도 '다른 데 더' 답변의 지역명은 center.label.
+    명동 카페는 1.5km 안이 3곳뿐 → 두 번째 목록은 모두 멀어서 먼 곳 안내가 앞에 붙고 '근처 추천' 문구는 안 씀."""
     api = Api(real_catalog, llm=FakeLLM(fail=True))
     api.say("명동 맛집 추천해줘")
     api.say("카페는?")
     r3 = api.say("다른 데 더 추천해줘")
-    assert r3["answer"].startswith(f"{r3['center']['label']} 근처 추천 장소를 지도에 표시했어요")
+    assert all(p["distance_m"] > 1500 for p in r3["places"])
+    assert r3["answer"].startswith(FAR_MORE_NOTICE.format(label=r3["center"]["label"]) + " 추천 장소를 지도에 표시했어요")
     assert "남산" not in r3["answer"]
+
+
+def test_more_far_notice_added_when_llm_omits_it(real_catalog):
+    """LLM 답에 '떨어/멀/km'가 없으면 먼 곳 안내를 앞에 붙이고, 있으면 두 번 붙이지 않는다."""
+    api = Api(real_catalog, llm=FakeLLM("새 카페를 골라봤어요."))
+    api.say("명동 맛집 추천해줘")
+    api.say("카페는?")
+    r3 = api.say("다른 데 더 추천해줘")
+    assert r3["answer"] == FAR_MORE_NOTICE.format(label="명동") + " 새 카페를 골라봤어요."
+    assert "'명동' 1.5km 안에는 더 보여드릴 곳이 없어서" in api.last_prompt()
+
+    api2 = Api(real_catalog, llm=FakeLLM("명동에서 조금 떨어진 카페예요."))
+    api2.say("명동 맛집 추천해줘")
+    api2.say("카페는?")
+    r3 = api2.say("다른 데 더 추천해줘")
+    assert r3["answer"] == "명동에서 조금 떨어진 카페예요."
+
+
+def test_more_near_results_have_no_far_notice(real_catalog):
+    """첫 추천(다른 데 더 아님)에는 먼 곳 안내가 붙지 않는다."""
+    api = Api(real_catalog, llm=FakeLLM("가짜 답변이에요."))
+    r = api.say("명동 맛집 추천해줘")
+    assert r["answer"] == "가짜 답변이에요."
 
 
 def test_session1_ordinal_info_keeps_pins_on_history(real_catalog):
@@ -292,6 +317,83 @@ def test_regression_casual_after_list(real_catalog):
     api.say("명동 맛집 추천해줘")
     r = api.say("고마워!")
     assert r["places"] == [] and r["center"] is None
+
+
+# ---------------------------------------------------------------- QA-4~7 재확인 (팀원1 733af89)
+
+def test_qa4_category_word_in_title_wins(real_catalog):
+    """QA-4: '아까 그 궁' → 이름에 '궁'이 든 장소(건청궁), 같은 분류의 첫 장소(가회동성당) 아님."""
+    api = Api(real_catalog)
+    r1 = api.say("종로 관광지")
+    titles = [p["title"] for p in r1["places"]]
+    assert "건청궁" in titles and titles[0] != "건청궁"
+    r = api.say("아까 그 궁 주차돼?")
+    assert_place_info(r)
+    assert api.history()[-1]["center"]["label"] == "건청궁"
+
+
+def test_qa4_gunggeum_is_not_palace(real_catalog):
+    """'궁금'의 '궁'은 분류 단어가 아님 → '궁금한데 아까 그 성당'은 가회동성당."""
+    api = Api(real_catalog)
+    api.say("종로 관광지")
+    api.say("궁금한데 아까 그 성당 주차돼?")
+    assert api.history()[-1]["center"]["label"] == "가회동성당"
+
+
+@pytest.mark.parametrize("message", ["6번째 거 어디야?", "여섯 번째 거 어디야?", "10번 어디야?"])
+def test_qa5_ordinal_out_of_range(real_catalog, message):
+    api = Api(real_catalog)
+    r1 = api.say("성수 카페")
+    n = len(r1["places"])
+    assert n == 5
+    r = api.say(message)
+    assert r["answer"] == ORDINAL_OUT_OF_RANGE.format(n=n)
+    assert r["places"] == [] and r["center"] is None
+    # 핀 복원 기준은 그대로
+    bots = [m for m in api.history() if m["role"] == "assistant" and m["places"]]
+    assert [p["id"] for p in bots[-1]["places"]] == ids(r1)
+
+
+@pytest.mark.parametrize("first", [None, "주차 가능해?"])
+def test_qa6_demonstrative_explain_without_target_asks_back(real_catalog, first):
+    api = Api(real_catalog)
+    if first:
+        api.say(first)
+    r = api.say("거기 어디야?")
+    assert r["answer"] == CLARIFY_ANSWER
+    assert r["places"] == [] and r["center"] is None
+
+
+def test_qa6_demonstrative_near_first_message_still_recommends(real_catalog):
+    api = Api(real_catalog)
+    r = api.say("거기 근처 카페 있어?")
+    assert is_cafe(real_catalog, r)
+
+
+def test_qa7_earlier_list_reference(real_catalog):
+    """QA-7: 직전 목록(관광지)에 없으면 그 전 추천 목록(맛집)에서 '아까 그 식당'을 찾는다."""
+    api = Api(real_catalog, llm=FakeLLM(fail=True))
+    r1 = api.say("명동 맛집 추천해줘")
+    api.say("광화문 근처 관광지")
+    r = api.say("아까 그 식당 몇 시에 열어?")
+    assert_place_info(r)
+    label = api.history()[-1]["center"]["label"]
+    assert label in [p["title"] for p in r1["places"]]
+
+
+# ---------------------------------------------------------------- 2글자 장소명 (팀원1 개선)
+
+def test_short_title_common_word_not_center(real_catalog):
+    """'기후'(장소명)가 일반 단어로 쓰이면 기준점이 아님."""
+    api = Api(real_catalog)
+    r = api.say("기후 변화 걱정 없는 실내 관광지 추천해줘")
+    assert r["center"] is None or r["center"]["label"] != "기후"
+
+
+def test_short_title_used_as_place_is_center(real_catalog):
+    api = Api(real_catalog)
+    r = api.say("기후 근처 카페")
+    assert r["center"]["label"] == "기후" and r["center"]["source"] == "place"
 
 
 # ---------------------------------------------------------------- /api/history 형식
