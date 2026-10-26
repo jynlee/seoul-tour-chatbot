@@ -53,6 +53,11 @@ export function foldBarHtml(center, places) {
     + '<span class="open">지도 보기 ▾</span>';
 }
 
+// 장소 영역에서 무엇을 보일지: 펼침 = 지도 + 아래 "▴ 지도 접기" 손잡이, 접힘 = 요약 바 + 칩, 장소 없음 = 모두 숨김
+export function placesView(has, mapOpen) {
+  return { map: has && mapOpen, handle: has && mapOpen, fold: has && !mapOpen, chips: has && !mapOpen };
+}
+
 export function placeChipsHtml(places, selectedId = null) {
   return places.map((p) => '<button type="button" class="chip ' + (p.kind === 'food' ? 'food' : 'tour') + '" data-id="' + esc(p.id) + '"'
     + (p.id === selectedId ? ' aria-pressed="true"' : '') + '>' + esc(chipLabel(p)) + '</button>').join('');

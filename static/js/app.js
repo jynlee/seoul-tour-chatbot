@@ -2,7 +2,7 @@
 // 첫 화면(S2a) → 첫 전송 → 결과 화면(지도 펼침) ⇄ 지도 접힘(B안)
 import { renderHome } from './home.js';
 import { renderMap } from './map.js';
-import { cardHtml, bubbleHtml, foldBarHtml, placeChipsHtml } from './view.js';
+import { cardHtml, bubbleHtml, foldBarHtml, placeChipsHtml, placesView } from './view.js';
 import { sendChat, fetchHistory } from './api.js';
 import { requestLocation } from './geo.js';
 import { startFollower } from './follower.js';
@@ -52,15 +52,21 @@ function saveSession(id) {
 // ---------- 결과 화면 뼈대 ----------
 function buildResult() {
   $('#result').innerHTML = '<div class="top"><span class="brand"><span class="badge" id="badge">' + badgeSvg(state.badgeId) + '</span>'
-    + '<span class="brand-name"><span class="seoul">서울</span> 여행친구</span></span>'
-    + '<button type="button" class="toggle" id="toggle" hidden>▾ 지도 접기</button></div>'
+    + '<span class="brand-name"><span class="seoul">서울</span> 여행친구</span></span></div>'
     + '<div class="map" id="map" hidden></div>'
-    + '<button type="button" class="fold" id="fold" hidden></button>'
+    + '<button type="button" class="handle" id="handle" aria-expanded="true" aria-controls="map" hidden>▴ 지도 접기</button>'
+    + '<button type="button" class="fold" id="fold" aria-expanded="false" aria-controls="map" hidden></button>'
     + '<div class="chips" id="chips" hidden></div>'
     + '<div class="card" id="card" hidden></div>'
     + '<div class="chat" id="chat" aria-live="polite"></div>';
-  $('#toggle').addEventListener('click', () => setMapOpen(!state.mapOpen));
-  $('#fold').addEventListener('click', () => setMapOpen(true));
+  // 누른 버튼이 숨으므로 키보드로 눌렀을 때는 포커스를 반대쪽 버튼으로 넘긴다
+  const swap = (open, next) => (e) => {
+    const kb = e.currentTarget.matches(':focus-visible');
+    setMapOpen(open);
+    if (kb) $(next).focus();
+  };
+  $('#handle').addEventListener('click', swap(false, '#fold'));
+  $('#fold').addEventListener('click', swap(true, '#handle'));
   $('#chips').addEventListener('click', (e) => {
     const chip = e.target.closest('.chip');
     if (chip) openCard(chip.dataset.id);
@@ -79,11 +85,11 @@ function showResult() {
 // ---------- 지도·요약 바·칩·카드 ----------
 function renderPlaces() {
   const has = state.places.length > 0;
-  $('#toggle').hidden = !has;
-  $('#toggle').textContent = state.mapOpen ? '▾ 지도 접기' : '▴ 지도 펼치기';
-  $('#map').hidden = !has || !state.mapOpen;
-  $('#fold').hidden = !has || state.mapOpen;
-  $('#chips').hidden = !has || state.mapOpen;
+  const show = placesView(has, state.mapOpen);
+  $('#map').hidden = !show.map;
+  $('#handle').hidden = !show.handle;
+  $('#fold').hidden = !show.fold;
+  $('#chips').hidden = !show.chips;
   if (!has) return;
   if (state.mapOpen) {
     renderMap($('#map'), {

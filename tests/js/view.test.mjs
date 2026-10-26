@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cardHtml, chipLabel, bubbleHtml, foldBarHtml, placeChipsHtml } from '../../static/js/view.js';
+import { cardHtml, chipLabel, bubbleHtml, foldBarHtml, placeChipsHtml, placesView } from '../../static/js/view.js';
 
 const GUNG = {
   id: '2786391', title: '개성만두 궁', kind: 'food', category: '한식',
@@ -68,4 +68,18 @@ test('장소 칩: 맛집/관광 테두리 클래스와 id', () => {
   assert.match(html, /class="chip food" data-id="2786391"/);
   assert.match(html, /class="chip tour" data-id="t1"/);
   assert.match(html, /🏯 경복궁 4분/);
+});
+
+test('지도 펼침: 지도와 바로 아래 "▴ 지도 접기" 손잡이만 보임', () => {
+  assert.deepEqual(placesView(true, true), { map: true, handle: true, fold: false, chips: false });
+});
+
+test('지도 접힘: 손잡이는 숨고 요약 바·칩이 보임', () => {
+  assert.deepEqual(placesView(true, false), { map: false, handle: false, fold: true, chips: true });
+});
+
+test('장소가 없으면 지도·손잡이·요약 바·칩 모두 숨김', () => {
+  const none = { map: false, handle: false, fold: false, chips: false };
+  assert.deepEqual(placesView(false, true), none);
+  assert.deepEqual(placesView(false, false), none);
 });
