@@ -14,6 +14,15 @@ DEMONSTRATIVES = ("거기 근처", "그 근처", "그 주변", "거기", "그곳
 
 _DONG = re.compile(r"^([가-힣]+동)(?:\d+가)?$")
 
+# 2글자 장소명('기후'·'길목'·'기와')은 일반 단어와 겹친다 → 질문 전체가 그 이름이거나,
+# 이름 바로 뒤에 장소로 쓰였다는 말이 올 때만 장소로 인정 ("기후 맛집", "길목에서 가까운", "구펠 주차 돼?").
+SHORT_TITLE_LEN = 2
+_PLACE_USAGE = ("근처", "주변", "가까운", "가까이", "맛집", "카페", "식당", "에서", "까지", "가는", "어디", "위치",
+                "주차", "영업", "메뉴", "전화", "몇 시", "몇시", "휴무", "가격", "예약")
+_PARTICLE = re.compile(r"^(?:은|는|이|가|도)\s*")
+_HANGUL = re.compile(r"[가-힣]")
+_TRIM = re.compile(r"[\s?!.~,]+")
+
 
 @dataclass
 class Center:
@@ -81,6 +90,19 @@ def _match_gu_alias(message: str) -> str | None:
     return None
 
 
+def _short_title_used_as_place(title: str, text: str) -> bool:
+    if _TRIM.sub("", text) == title.replace(" ", ""):
+        return True
+    for m in re.finditer(re.escape(title), text):
+        if m.start() > 0 and _HANGUL.match(text[m.start() - 1]):
+            continue  # '골목길목'처럼 다른 단어의 일부
+        rest = text[m.end():].lstrip()
+        rest = rest if rest.startswith(_PLACE_USAGE) else _PARTICLE.sub("", rest)
+        if rest.startswith(_PLACE_USAGE):
+            return True
+    return False
+
+
 def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
     """카탈로그 제목이 질문에 포함되면: 정확히 같은 제목 > 가장 긴 제목 > 가장 짧은 id."""
     text = message.strip()
@@ -95,6 +117,8 @@ def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
         if not p.title or not has_coords(p) or p.title not in text:
             continue
         if any(p.title in n for n in bigger_names):
+            continue
+        if len(p.title.replace(" ", "")) <= SHORT_TITLE_LEN and not _short_title_used_as_place(p.title, text):
             continue
         candidates.append(p)
     if not candidates:

@@ -175,3 +175,12 @@ def test_info_template_general():
 
     p = SMALL_PLACES[2]  # 가회동성당
     assert info_template_answer(p, []) == "가회동성당: 역사관광지, 주소 서울특별시 종로구 북촌로 57 (가회동), 전화 02-763-1570."
+
+
+def test_short_title_common_word_not_center(real_catalog):
+    # 장소 '기후'(성수 일식집)가 '기후 변화'의 기후로 기준점이 되면 안 됨
+    s = Session(real_catalog)
+    r = s.say("기후 변화 걱정 없는 실내 관광지 추천해줘")
+    assert r.center is None
+    r = s.say("기후 맛집 근처 카페")
+    assert r.center.label == "기후"

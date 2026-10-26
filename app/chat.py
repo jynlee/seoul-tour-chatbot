@@ -20,8 +20,8 @@ from app.dialog import (
 )
 from app.intent import CASUAL_RESPONSES, detect_intent
 from app.llm import (
-    CLARIFY_ANSWER, NO_MORE_ANSWER, LLMUnavailable, build_info_prompt, build_prompt, info_template_answer,
-    template_answer,
+    CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, LLMUnavailable, all_far, build_info_prompt, build_prompt,
+    info_template_answer, mentions_far, template_answer,
 )
 from app.recommend import recommend
 from app.schemas import CenterOut, ChatRequest, ChatResponse
@@ -104,13 +104,20 @@ class ChatService:
         if more and not rec.places:
             return self._reply(sid, msg, NO_MORE_ANSWER.format(label=f"{label} 근처" if label else "이"))
 
+        # "다른 데 더"인데 남은 곳이 모두 반경 밖이면 멀다는 사실을 꼭 알린다 (LLM이 빠뜨리면 안내 문장을 앞에 붙임)
+        far_notice = FAR_MORE_NOTICE.format(label=label) if more and label and all_far(rec.places) else None
         try:
             answer = self.deps.llm.generate(
-                build_prompt(msg, history_texts, rec.places, label, rec.fallback_note, more=more))
+                build_prompt(msg, history_texts, rec.places, label, rec.fallback_note, more=more,
+                             far_notice=far_notice))
+            if far_notice and not mentions_far(answer):
+                answer = f"{far_notice} {answer}"
         except LLMUnavailable:
-            answer = template_answer(rec.places, label)
+            answer = template_answer(rec.places, label, far=far_notice is not None)
             if rec.fallback_note and rec.places:
                 answer = f"{answer} ({rec.fallback_note})"
+            if far_notice:
+                answer = f"{far_notice} {answer}"
         return self._reply(sid, msg, answer, center=center_out, places=rec.places)
 
     @staticmethod

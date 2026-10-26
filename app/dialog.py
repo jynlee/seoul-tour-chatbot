@@ -55,10 +55,23 @@ _CATEGORY_WORDS = {
     "궁": "역사관광지", "쇼핑": "쇼핑", "시장": "쇼핑", "축제": "축제", "공연": "공연/행사",
 }
 _KIND_WORDS = {"식당": "food", "맛집": "food", "음식점": "food", "밥집": "food", "관광지": "tour", "명소": "tour"}
+# 한 글자 분류 단어('궁')는 '궁금'처럼 다른 낱말 속에 흔히 들어간다 → 뒤가 끝·한글 아님·조사일 때만 인정
+_PARTICLES = ("은", "는", "이", "가", "을", "를", "에", "도", "만", "로", "으로", "랑", "의", "였")
+_HANGUL = re.compile(r"[가-힣]")
 
 
 def _has(message: str, words) -> bool:
     return any(w in message for w in words)
+
+
+def _has_word(message: str, word: str) -> bool:
+    if len(word) > 1:
+        return word in message
+    for m in re.finditer(re.escape(word), message):
+        rest = message[m.end():]
+        if not rest or not _HANGUL.match(rest[0]) or rest.startswith(_PARTICLES):
+            return True
+    return False
 
 
 def asked_fields(message: str) -> list[str]:
@@ -115,9 +128,9 @@ def _partial_match(message: str, last_places: list[PlaceOut], use_category: bool
         score = _longest_title_substring(p.title, message)
         score = score if score >= 2 else 0
         if use_category:
-            if any(w in message and p.category == cat for w, cat in _CATEGORY_WORDS.items()):
+            if any(p.category == cat and _has_word(message, w) for w, cat in _CATEGORY_WORDS.items()):
                 score = max(score, 2)
-            elif any(w in message and p.kind == kind for w, kind in _KIND_WORDS.items()):
+            elif any(p.kind == kind and _has_word(message, w) for w, kind in _KIND_WORDS.items()):
                 score = max(score, 1)
         if score > best_score:
             best, best_score = p, score

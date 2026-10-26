@@ -26,8 +26,18 @@ def _place_line(i: int, p: PlaceOut) -> str:
     return line
 
 
+def all_far(places: list[PlaceOut]) -> bool:
+    """모든 장소가 기준점 반경(1.5km) 밖인지 ("다른 데 더"에서 가까운 곳이 바닥난 경우)."""
+    return bool(places) and all(p.distance_m is not None and p.distance_m > NEAR_RADIUS_M for p in places)
+
+
+def mentions_far(answer: str) -> bool:
+    return any(w in answer for w in ("떨어", "멀", "km"))
+
+
 def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
-                 center_label: str | None, fallback_note: str | None, more: bool = False) -> str:
+                 center_label: str | None, fallback_note: str | None, more: bool = False,
+                 far_notice: str | None = None) -> str:
     history = "\n".join(history_texts[-HISTORY_LIMIT:]) or "(없음)"
     place_text = "\n".join(_place_line(i, p) for i, p in enumerate(places, 1)) or "(없음)"
     rules = [
@@ -46,6 +56,9 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
         rules.append("답변 끝에 현재 위치(📍)를 켜거나 지역 이름을 말해 주면 더 가까운 곳을 찾아 준다고 안내할 것")
     if more:
         rules.append("사용자가 다른 곳을 원했다. [추천 장소]는 이전에 보여 준 곳을 뺀 새 장소들이라는 점을 자연스럽게 말할 것")
+    if far_notice:
+        rules.append(f"'{center_label}' 1.5km 안에는 더 보여드릴 곳이 없어서 떨어진 곳을 골랐다. "
+                     "첫 문장에서 이 사실(떨어져 있다는 점)을 솔직히 말하고, '기준점'이라는 단어는 쓰지 말 것")
     if fallback_note:
         rules.append(f"기준점 반경 안에 장소가 없어서 가까운 곳을 골랐다. 다음 문장을 반드시 언급할 것: \"{fallback_note}\"")
     rules_text = "\n".join(f"{i}. {r}" for i, r in enumerate(rules, 1))
@@ -72,6 +85,7 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
 
 CLARIFY_ANSWER = "어느 곳을 말씀하시는지 알려주세요. 장소 이름을 말하거나 지도에서 핀을 눌러 주시면 알려드릴게요."
 NO_MORE_ANSWER = "{label} 조건으로 더 보여드릴 곳이 없어요. 다른 지역이나 종류로 물어봐 주세요."
+FAR_MORE_NOTICE = "{label} 근처(1.5km 안)에는 더 보여드릴 곳이 없어서 조금 떨어진 곳을 골랐어요."
 
 
 def _labels():
@@ -147,10 +161,12 @@ def info_template_answer(place, fields: list[str]) -> str:
     return answer
 
 
-def template_answer(places: list[PlaceOut], center_label: str | None) -> str:
+def template_answer(places: list[PlaceOut], center_label: str | None, far: bool = False) -> str:
     if not places:
         return "조건에 맞는 장소를 찾지 못했어요. 다른 지역이나 종류로 물어봐 주세요."
     names = ", ".join(p.title for p in places)
+    if far:
+        return f"추천 장소를 지도에 표시했어요: {names}"
     if center_label:
         return f"{center_label} 근처 추천 장소를 지도에 표시했어요: {names}"
     return f"추천 장소를 지도에 표시했어요: {names}"
