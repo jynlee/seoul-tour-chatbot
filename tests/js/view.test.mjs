@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cardHtml, chipLabel, bubbleHtml, foldBarHtml, placeChipsHtml } from '../../static/js/view.js';
+import { cardHtml, chipLabel, bubbleHtml, foldBarHtml, placeChipsHtml, placesView } from '../../static/js/view.js';
 
 const GUNG = {
   id: '2786391', title: '개성만두 궁', kind: 'food', category: '한식',
@@ -59,6 +59,18 @@ test('접힘 요약 바: "{label} 근처 · 추천 N곳"', () => {
   assert.equal((html.match(/<i /g) || []).length, 2);
 });
 
+test('접힘 요약 바: 구 전체 기준(gu)이면 "근처" 없이 "강서구 · 추천 N곳"', () => {
+  const gu = { lat: 37.5509, lng: 126.8495, label: '강서구', source: 'gu' };
+  assert.match(foldBarHtml(gu, [GUNG]), /<b>강서구<\/b><span> · 추천 1곳<\/span>/);
+  assert.match(foldBarHtml({ ...gu, label: '성수', source: 'area' }, [GUNG]), /<b>성수 근처<\/b>/);
+});
+
+test('도보 정보가 null이면(구 전체 기준) 칩·카드에서 도보 표시 숨김', () => {
+  const p = { ...GUNG, distance_m: null, walk_min: null };
+  assert.equal(chipLabel(p), '🍽️ 개성만두 궁');
+  assert.doesNotMatch(cardHtml(p, { centerLabel: '강서구' }), /🚶|약 .*분/);
+});
+
 test('접힘 요약 바: 기준점이 없으면 "추천 장소"', () => {
   assert.match(foldBarHtml(null, [GUNG]), /<b>추천 장소<\/b><span> · 추천 1곳<\/span>/);
 });
@@ -68,4 +80,18 @@ test('장소 칩: 맛집/관광 테두리 클래스와 id', () => {
   assert.match(html, /class="chip food" data-id="2786391"/);
   assert.match(html, /class="chip tour" data-id="t1"/);
   assert.match(html, /🏯 경복궁 4분/);
+});
+
+test('지도 펼침: 지도와 바로 아래 "▴ 지도 접기" 손잡이만 보임', () => {
+  assert.deepEqual(placesView(true, true), { map: true, handle: true, fold: false, chips: false });
+});
+
+test('지도 접힘: 손잡이는 숨고 요약 바·칩이 보임', () => {
+  assert.deepEqual(placesView(true, false), { map: false, handle: false, fold: true, chips: true });
+});
+
+test('장소가 없으면 지도·손잡이·요약 바·칩 모두 숨김', () => {
+  const none = { map: false, handle: false, fold: false, chips: false };
+  assert.deepEqual(placesView(false, true), none);
+  assert.deepEqual(placesView(false, false), none);
 });

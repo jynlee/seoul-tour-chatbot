@@ -40,6 +40,7 @@ export function bubbleHtml(role, text) {
 }
 
 // 접힘(B안) 요약 바: 미니맵 썸네일 + "{label} 근처 · 추천 N곳" + "지도 보기 ▾"
+// 구 전체 기준(source 'gu')이면 "근처" 없이 "강서구 · 추천 N곳"
 export function foldBarHtml(center, places) {
   const pts = places.filter((p) => p.lat && p.lng);
   const b = computeBounds([...pts, center].filter(Boolean), { minSpanM: 300, pad: 0.1 });
@@ -47,10 +48,15 @@ export function foldBarHtml(center, places) {
     const q = project(p.lat, p.lng, b, 40, 22);
     return '<i style="left:' + Math.round(q.x + 6) + 'px;top:' + Math.round(q.y + 6) + 'px;background:' + (p.kind === 'food' ? '#ff9f43' : '#ff8fa3') + '"></i>';
   }).join('');
-  const title = center && center.label ? esc(center.label) + ' 근처' : '추천 장소';
+  const title = center && center.label ? esc(center.label) + (center.source === 'gu' ? '' : ' 근처') : '추천 장소';
   return '<div class="mini">' + dots + '</div>'
     + '<div class="sum"><b>' + title + '</b><span> · 추천 ' + places.length + '곳</span></div>'
     + '<span class="open">지도 보기 ▾</span>';
+}
+
+// 장소 영역에서 무엇을 보일지: 펼침 = 지도 + 아래 "▴ 지도 접기" 손잡이, 접힘 = 요약 바 + 칩, 장소 없음 = 모두 숨김
+export function placesView(has, mapOpen) {
+  return { map: has && mapOpen, handle: has && mapOpen, fold: has && !mapOpen, chips: has && !mapOpen };
 }
 
 export function placeChipsHtml(places, selectedId = null) {
