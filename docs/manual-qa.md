@@ -78,7 +78,7 @@ RF = 계획서 Review Focus.
 # B8·B9 화면 시나리오 점검 (장소 정보 질문·멀티턴)
 
 - 점검일: 2026-10-26 · 점검: 팀원3(QA)
-- 대상: `feat/qa` (feat/backend 51b8c0d 병합 — B8·B9, B7 574/574, 개선 3개, QA-4~7 수정, 구 전체 고르기·관광 세부 주제 포함). 1차 점검은 9f38d69 기준(14항목 통과, QA-4~7 발견), 2차는 b101c72(17항목)
+- 대상: `feat/qa` (feat/backend b689e90 병합 — B8·B9, B7 574/574, 개선 3개, QA-4~7 수정, 구 전체 고르기·관광 세부 주제 포함). 1차 점검은 9f38d69 기준(14항목 통과, QA-4~7 발견), 2차는 b101c72(17항목)
 - 환경: 위와 같음(헤드리스 Chrome, iPhone 14 Pro 393x852, 실서비스). 서버는 포트 **8012** 하나(정상).
 - 자동 실행: `scripts/qa_mobile/run_b89.mjs`
 
@@ -90,7 +90,7 @@ node scripts/qa_mobile/run_b89.mjs <스크린샷 폴더> http://localhost:8012
 끝나면 `<스크린샷 폴더>/results.json`의 `sessions`를 `MySQLHistoryRepo.delete_session()`으로 지운다(완료).
 스크린샷: `C:\Users\SMT03\AppData\Local\Temp\claude\C--Users-SMT03-SeoulTourChatbot\1f8c78e6-b194-4613-a7ad-8121fad70e0f\scratchpad\shots\b89-*.png`
 
-## 결과: 19개 항목 모두 통과 (51b8c0d 재점검)
+## 결과: 19개 항목 모두 통과 (b689e90 재점검)
 
 | # | 항목 | 결과 | 스크린샷 | 확인한 내용 |
 |---|---|---|---|---|
@@ -112,6 +112,10 @@ node scripts/qa_mobile/run_b89.mjs <스크린샷 폴더> http://localhost:8012
 | QA-6 | 첫 메시지 "거기 어디야?" | ✅ | — | 되묻기, 핀 없음 |
 | GU-1 | "강서구 공원 추천해줘" | ✅ | `b89-12-gu-park.png` | 강서구 기준, 1번 칩·핀 🌳 강서습지생태공원 |
 | GU-2 | "금천구 산책할 곳" | ✅ | `b89-13-topic-missing.png` | "아쉽게도 금천구에는 산책이나 자연에 딱 맞는 곳은 없어요. 대신…" + 핀 |
+| GU-3 | "종로 관광지" → 종로구 전체에서 고름 | ✅ (자동) | — | 구 밖 장소 없음, 중심 1.5km 밖 장소 포함, 프롬프트에 거리·'조금 멂' 규칙 없음 (`test_gu_wide_may_exceed_radius`, `test_topic_carried_to_more_in_gu_wide_prompt_has_no_far_rule`) |
+| GU-4 | "한강 근처 맛집" → 음식점만 | ✅ (자동) | — | `test_hangang_food_is_food_only`, 실서비스 `test_live_topic_missing_and_hangang_food` |
+| GU-5 | "강서구 공원" → "다른 데 더" 주제 이어받기 | ✅ (자동) | — | 강서구·관광 유지, 이전과 안 겹침, 프롬프트에 '산책·자연' (남은 곳이 주제와 안 맞으면 '딱 맞는 곳이 없다' 규칙) |
+| GU-6 | "궁금한 게 있는데 종로 관광지 추천해줘" → '궁' 역사 주제로 안 잡힘 | ✅ (자동) | — | `test_gunggeum_does_not_trigger_history_topic` |
 | B8-5 | 대상 없는 "주차 가능해?" | ✅ | `b89-10-clarify.png` | 되묻기 말풍선(오류 아님), 핀 없음 |
 
 LLM 다운 시 detail 템플릿은 화면 대신 통합 테스트로 확인(`tests/integration/test_live_multiturn.py::test_live_info_llm_down_uses_detail`: "가회동성당 — 주차: 가능.").
@@ -134,6 +138,7 @@ LLM 다운 시 detail 템플릿은 화면 대신 통합 테스트로 확인(`tes
 
 ## 자동 테스트 결과 (B8·B9 추가 후)
 
-- `pytest -m "not integration"`: 227 통과 (QA 신규 `tests/api/test_multiturn_api.py` 44)
+- `pytest -m "not integration"`: 229 통과 (QA 신규 `tests/api/test_multiturn_api.py` 46)
 - `pytest -m integration`: 33 통과 (QA 신규 `tests/integration/test_live_multiturn.py` 13)
 - `node --test "tests/js/*.test.mjs"`: 37 통과
+- 화면 Q2 기존 24항목(`run.mjs`) 재실행: 24개 통과 (b689e90, 정상 8012 / OpenSearch 끔 8013 / Ollama 끔 8014 — `QA_OK`·`QA_OS_DOWN`·`QA_LLM_DOWN` 환경 변수로 주소 지정)

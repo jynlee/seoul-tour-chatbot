@@ -467,14 +467,23 @@ def test_hangang_food_is_food_only(real_catalog):
 
 
 def test_topic_carried_to_more(real_catalog):
-    """'강서구 공원' → '다른 데 더': 구·관광 유지, 이전과 안 겹침."""
+    """'강서구 공원' → '다른 데 더': 구·관광·산책 주제 유지, 이전과 안 겹침, 주제 맞는 곳이 앞."""
     api = Api(real_catalog)
     r1 = api.say("강서구 공원 추천해줘")
     r2 = api.say("다른 데 더 추천해줘")
-    if r2["places"]:
-        assert r2["center"]["label"] == "강서구"
-        assert all(p["kind"] == "tour" for p in r2["places"])
-        assert not set(ids(r2)) & set(ids(r1))
+    assert r2["places"], r2["answer"]
+    assert r2["center"]["label"] == "강서구"
+    assert all(p["kind"] == "tour" for p in r2["places"])
+    assert not set(ids(r2)) & set(ids(r1))
+    # 주제를 이어받음: 맞는 곳이 남아 있으면 '질문 주제는', 다 썼으면 '딱 맞는 곳이 없다' 규칙 — 어느 쪽이든 산책·자연
+    assert "'산책·자연'" in api.last_prompt()
+
+
+def test_topic_carried_to_more_in_gu_wide_prompt_has_no_far_rule(real_catalog):
+    """b689e90: 구 결과 프롬프트에는 '기준점에서 조금 멂' 규칙 자체가 없음."""
+    api = Api(real_catalog)
+    api.say("종로 관광지")
+    assert "기준점에서 조금 멂" not in api.last_prompt()
 
 
 def test_gunggeum_does_not_trigger_history_topic(real_catalog):

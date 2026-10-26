@@ -5,9 +5,10 @@ import { launch, newPage, setGeo, sleep } from './cdp.mjs';
 
 const SHOTS = process.argv[2];
 mkdirSync(SHOTS, { recursive: true });
-const OK = 'http://localhost:8011';
-const OS_DOWN = 'http://localhost:8012';
-const LLM_DOWN = 'http://localhost:8013';
+// 주소는 환경 변수로 바꿀 수 있음 (QA_OK / QA_OS_DOWN / QA_LLM_DOWN)
+const OK = process.env.QA_OK || 'http://localhost:8011';
+const OS_DOWN = process.env.QA_OS_DOWN || 'http://localhost:8012';
+const LLM_DOWN = process.env.QA_LLM_DOWN || 'http://localhost:8013';
 
 const results = [];
 const sessions = new Set();
