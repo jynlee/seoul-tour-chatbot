@@ -133,6 +133,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-weight: 400; font-size: 21px; line-height: 1.2; color: var(--brown);
 }
 .top .brand-name .seoul { color: #ff6f8d; }
+/* "새 대화": 예전 상단 "지도 접기" 토글 글자 모양 그대로 */
+.top .newchat {
+  border: 0; background: none; padding: 4px 0; font-weight: 400; color: #c07a8a; font-size: 14px;
+}
 
 /* 정보 카드 */
 .card {
