@@ -69,3 +69,11 @@ def test_ollama_unreachable_raises():
 
     with pytest.raises(LLMUnavailable):
         OllamaLLM(S(), timeout=2).generate("안녕")
+
+
+def test_mentions_missing():
+    from app.llm import mentions_missing
+
+    assert mentions_missing("산책이나 자연 위주의 장소는 찾기 어려워요.")
+    assert mentions_missing("아쉽게도 공원은 없지만")
+    assert not mentions_missing("강서구에 있는 곳들이에요.")
