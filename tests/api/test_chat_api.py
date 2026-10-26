@@ -269,7 +269,8 @@ def test_missing_tel_and_image_are_empty_strings(client, catalog):
 
 
 def test_tel_present_passes_through(client):
-    _, body = chat(client, "가회동성당 근처 관광지")
+    # B9부터 기준점이 된 장소는 결과에서 빠지므로 구 기준으로 조회
+    _, body = chat(client, "종로 관광지")
     church = next(p for p in body["places"] if p["id"] == "2733967")
     assert church["tel"] == "02-763-1570"
     assert church["image"] == ""
