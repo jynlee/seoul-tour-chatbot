@@ -232,6 +232,7 @@ def test_gangseo_walk_and_park(real_catalog):
         assert r.center.label == "강서구", q
         assert r.places[0].title == "강서습지생태공원", q
         assert all(real_catalog[p.id].gu == "강서구" for p in r.places), q
+        assert all(p.distance_m is None and p.walk_min is None for p in r.places), q  # QA-8
 
 
 def test_topic_missing_says_so(real_catalog):
