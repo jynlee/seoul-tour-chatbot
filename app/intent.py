@@ -41,6 +41,7 @@ class Intent:
     content_types: set[str] = field(default_factory=lambda: set(ALL_TYPES))
     cat3: str | None = None
     casual: bool = False
+    has_category: bool = False  # 질문에 맛집·카페·관광·축제 키워드가 실제로 있었는지 (없으면 직전 턴에서 이어받음)
 
 
 def _has(message: str, keywords) -> bool:
@@ -60,7 +61,7 @@ def detect_intent(message: str) -> Intent:
     wants_food = food or cafe
     if festival and not wants_food and not tour:
         # "이번 주 축제"처럼 축제·행사만 물으면 축제/행사만
-        return Intent(content_types={EVENT_TYPE}, cat3=None, casual=False)
+        return Intent(content_types={EVENT_TYPE}, cat3=None, casual=False, has_category=True)
 
     if wants_food and not tour:
         types = {FOOD_TYPE}
@@ -72,4 +73,4 @@ def detect_intent(message: str) -> Intent:
         types.add(EVENT_TYPE)
 
     cat3 = CAFE_CAT3 if (cafe and not food and not tour) else None
-    return Intent(content_types=types, cat3=cat3, casual=False)
+    return Intent(content_types=types, cat3=cat3, casual=False, has_category=wants_food or tour or festival)

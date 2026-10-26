@@ -18,7 +18,7 @@ def test_build_prompt_contents():
     assert "도보 12분" in prompt
     assert "가장 가까운 곳은 2.3km 떨어진 개성만두 궁예요" in prompt
     assert "반드시" in prompt
-    assert "질문9" in prompt and "질문3" not in prompt  # 최근 6개만
+    assert "질문9" in prompt and "질문2" in prompt and "질문1" not in prompt  # 최근 8개(약 4턴)만
     assert "광화문 근처 맛집" in prompt
 
 
@@ -45,6 +45,14 @@ def test_build_prompt_center_label_and_far_mark():
     lines = prompt.splitlines()
     assert "조금 멂" in next(l for l in lines if "먼카페" in l)
     assert "조금 멂" not in next(l for l in lines if "가까운카페" in l)
+
+
+def test_build_prompt_history_not_a_source_and_more_hint():
+    prompt = build_prompt("다른 데 더 추천해줘", ["챗봇: 감꽃당 추천 [보여 준 장소: 감꽃당]"], [_place("개뿔", 40)],
+                          "명동", None, more=True)
+    assert "[이전 대화]에 나온 장소" in prompt
+    assert "이전에 보여 준 곳을 뺀 새 장소" in prompt
+    assert "이전에 보여 준 곳을 뺀" not in build_prompt("맛집", [], [_place("A")], "명동", None)
 
 
 def test_template_answer():

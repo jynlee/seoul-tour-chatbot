@@ -21,6 +21,7 @@ class Center:
     lng: float
     label: str
     source: str  # gps | place | area | gu | history
+    place_id: str | None = None  # source=place 일 때 그 장소 id (추천 결과에서 자기 자신은 뺌)
 
     def to_out(self) -> CenterOut:
         return CenterOut(lat=self.lat, lng=self.lng, label=self.label, source=self.source)
@@ -83,7 +84,8 @@ def _match_gu_alias(message: str) -> str | None:
 def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
     """카탈로그 제목이 질문에 포함되면: 정확히 같은 제목 > 가장 긴 제목 > 가장 짧은 id."""
     text = message.strip()
-    # 지역·구 이름 안에 들어 있는 짧은 제목(예: '강남역' 속 '강남')은 장소로 보지 않는다.
+    # 지역·구 이름과 같거나 그 안에 들어 있는 제목(예: '강남'=강남구, '강남역' 속 '강남')은 장소로 보지 않는다.
+    # → 구/지역 이름이 같은 이름의 장소보다 우선.
     bigger_names = [n for n in AREAS if n in text]
     alias = _match_gu_alias(text)
     if alias:
@@ -92,7 +94,7 @@ def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
     for p in catalog.values():
         if not p.title or not has_coords(p) or p.title not in text:
             continue
-        if any(p.title in n and len(n) > len(p.title) for n in bigger_names):
+        if any(p.title in n for n in bigger_names):
             continue
         candidates.append(p)
     if not candidates:
@@ -107,6 +109,15 @@ def _match_dong(message: str, catalog: dict[str, Place]) -> tuple[str, list[Plac
         return None
     name = max(hits, key=len)
     return name, index[name]
+
+
+def match_place(message: str, catalog: dict[str, Place]) -> Place | None:
+    return _match_place(message, catalog)
+
+
+def has_named_area(message: str, catalog: dict[str, Place]) -> bool:
+    """질문에 지역(이름표)·동·구 이름이 있는지 (장소 이름은 제외)."""
+    return _match_area(message) is not None or _match_gu(message) is not None or _match_dong(message, catalog) is not None
 
 
 def resolve_center(
@@ -131,11 +142,11 @@ def resolve_center(
     if not named and last_places and any(d in message for d in DEMONSTRATIVES):
         chosen = next((p for p in last_places if p.id == selected_place_id), None) if selected_place_id else None
         chosen = chosen or last_places[0]
-        return Center(lat=chosen.lat, lng=chosen.lng, label=chosen.title, source="place")
+        return Center(lat=chosen.lat, lng=chosen.lng, label=chosen.title, source="place", place_id=chosen.id)
 
     # ③ 카탈로그 장소명
     if place is not None:
-        return Center(lat=place.lat, lng=place.lng, label=place.title, source="place")
+        return Center(lat=place.lat, lng=place.lng, label=place.title, source="place", place_id=place.id)
 
     # ④ 인기 지역 이름표
     if area is not None:

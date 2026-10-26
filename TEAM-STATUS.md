@@ -28,6 +28,9 @@
 | B4 | chat_message 대화 기록 저장소 | 팀원1 | T0 | ✅ 팀원1 |
 | B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ✅ 팀원1 |
 | B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ✅ 팀원1 |
+| B7 | 관광공사 상세 정보 보강(detailIntro2 → detail) | 팀원1 | B1 | 🔄 팀원1 (코드 ✅, 데이터 469/574 — 일일 한도, 다음 날 이어서) |
+| B8 | 장소 정보 질문 의도(place_info) | 팀원1 | B6, B7 | ✅ 팀원1 (팀원3 검증 대기) |
+| B9 | 멀티턴(순서·이름 지칭, "다른 데 더", 조건 이어받기, 프롬프트에 최근 대화) | 팀원1 | B8 | ✅ 팀원1 (팀원3 검증 대기) |
 | F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ✅ 팀원2 |
 | F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ✅ 팀원2 |
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ✅ 팀원2 |
@@ -52,6 +55,7 @@
   - LLM 실패 시 answer = `template_answer` 문구. 단, 반경 안 장소가 없어 가까운 곳으로 대체한 경우에만 뒤에 ` (가장 가까운 곳은 2.3km 떨어진 ○○예요)`가 붙음.
   - `tel`은 관광공사 원문 그대로라 `"광화문 관광안내소 02-735-8688"`, `"강남구청 02-3423-6000~3 …"`처럼 설명이 섞일 수 있음(457/574건 있음).
   - 기준점 없는 검색(예: "이번 주 축제")은 `center:null`, `distance_m/walk_min:null`.
+- 2026-10-23 B8·B9(팀원1): **API 필드 변경 없음.** 장소 정보 질문("고려삼계탕 주차 돼?", "두 번째 거기 어디야?")·되묻기·"다른 데 더"가 없을 때의 응답은 `places: []`, `center: null` → 프론트는 "고마워!"처럼 지도·핀 유지. 단 `/api/history`에는 이 봇 메시지가 `center:{source:"place", label:장소이름}`, `places:[]`로 저장됨(다음 "거기"가 그 장소를 가리키게 하려는 용도). 프론트 복원은 "places가 있는 마지막 봇 메시지" 기준이라 영향 없음.
 - 2026-10-23 QA-1 수정(팀원1, 팀원3 리포트): `ChatRequest.session_id`에 **최대 64자** 제한 추가 → 넘으면 422. (`chat_message.session_id`가 VARCHAR(64)라 긴 id는 기록이 조용히 안 남던 문제.) 프론트는 UUID(36자)라 영향 없음.
 
 ## ⑤ 결정 사항 로그
@@ -88,6 +92,15 @@
 - B5 보충: 프롬프트에 "날짜·영업시간·가격 등 없는 정보 말하지 말 것" 규칙 추가(축제 질문에 "이번 주에 열리는"이라고 지어낸 사례 있었음).
 - QA-1 수정(850364d): `session_id` 최대 64자(④ 참고).
 - QA-2 수정(답변 문구): 프롬프트 규칙 보강 — 기준점 없으면 "근처·주변"·지역명 금지 + 📍/지역을 알려 달라는 안내, 기준점 있으면 그 이름만 쓰기, 1500m 넘는 장소 줄에 "기준점에서 조금 멂" 표시. 실제 Ollama로 QA 재현 3건×2회 확인(모두 개선). LLM 출력이라 완전 보장은 아님.
+- B7(2026-10-23): `scripts/enrich_detail.py` — detailIntro2를 타입별로 골라 `detail`(parking·hours·rest_day·menu·fee·reservation·pet·stroller·contact·period·place·season·discount·age·packing)로 저장, `<br>`→` / `, 키 가림, 한 건마다 원자적 저장(임시 파일→교체, Windows 파일 잠금 재시도 — 처음엔 쓰기 중 `OSError 22`로 죽었음). **관광공사 일일 호출 한도(LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR)로 469/574에서 중단.** 채움(574 기준): contact 358, hours 357, rest_day 313, parking 175, fee 128, stroller 86, menu 84, period 50, place 45, age 9, discount 3. `Place.detail`로 로딩됨.
+- B8·B9(2026-10-23, 커밋 25bea2d): 리드 재현 세션
+  - 세션1: "명동 맛집 추천해줘"→"카페는?"→"다른 데 더 추천해줘"(전엔 카페를 잃고 남산 관광지, 답변 '남산 근처' 불일치)→"두 번째 거기 어디야?"(전엔 재검색·핀 교체)
+  - 세션2: "강남 관광지 알려줘"(전엔 center가 장소 '강남')→"아까 첫 번째 거 다시 알려줘"(전엔 강남 식당 재검색)→"거기서 가까운 맛집은?"(연쇄 오류)
+  - 지금 동작(FakeLLM 회귀 `tests/test_multiturn.py` + 실서버 확인): 세션1 → 명동 카페 → 명동 기준 이전과 겹치지 않는 카페 3곳 → 두 번째 카페 설명(places [], 핀 유지). 세션2 → center 강남구(gu) → 1번 장소 설명 → 그 장소 기준 맛집.
+  - 구조: `app/dialog.py`(지칭 해석 `resolve_reference`: 순서 > 이름(최근 목록 우선) > "아까 그 ○○"(이름 일부·분류) > "거기"(selected → 방금 설명한 장소 → 직전 첫 장소), `asked_fields`, `is_near`/`is_more_request`/`is_explain`, `intent_from_places`, `format_history`). `ChatService.handle` 순서: (근처·추천·다른 데 아님) 정보 키워드 또는 순서/이름 지칭+설명 → place_info / 일상 대화 / 추천(빠진 카테고리 이어받기, 지칭 장소=기준점, "다른 데 더"는 같은 기준점에서 보여 준 곳 제외, 남은 게 없으면 솔직히 안내).
+  - place_info: 물어본 항목이 detail에 하나도 없으면 LLM 없이 "고려삼계탕 — 주차 정보는 없어요. 전화(02-…)로 확인해 보세요." Ollama 다운이면 detail 값 그대로 템플릿. 대상 없으면 되묻기.
+  - 기타: 구/지역 이름이 같은 이름의 장소보다 우선(`강남`=강남구, `대학로`=지역). 기준점이 장소면 그 장소는 결과에서 뺌. 프롬프트 최근 대화 6→8줄(약 4턴, 봇 턴에 기준점·보여 준 장소 이름), "이전 대화 장소 재추천 금지" 규칙(실측: '다른 데 더'에서 이전 카페 이름을 다시 말하던 문제 해결).
+  - 테스트: 단위 100개 통과, `pytest -m integration` 9개 통과(`tests/integration/test_live_multiturn_backend.py` 포함, 끝나면 세션 삭제). 확인용으로 만든 test-* 세션은 chat_message에서 모두 지움.
 - 알려진 한계: 2글자 장소명(`기후`, `길목`, `기와` 등)이 일반 단어로 질문에 들어가면 그 장소가 기준점이 됨(드묾, 그대로 둠).
 
 ### 팀원2 frontend
@@ -121,5 +134,10 @@
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
+- 팀원1 다음에 바로 할 일 (2026-10-23 중단 시점):
+  1. B7 데이터 이어받기: worktree 루트에 `.env` 복사 후 `python scripts/enrich_detail.py` (detail 있는 469건은 건너뜀, 남은 105건). 끝나면 항목별 채움 비율이 출력됨 → `data/seoul_tour_enriched.json` 커밋, B7 ✅, 리드에게 비율 보고. (인덱스 재색인은 불필요 — detail은 카탈로그에서만 씀)
+  2. 팀원3(`a3b7fc5a951212262`)에게 B8·B9 알리고 테스트·manual-qa 보강 요청(아직 안 보냄): 세션1·2 시나리오, 정보 질문(이름/거기+선택/거기+첫 장소/정보 없음/LLM 다운/대상 없음), "거기 근처 카페" 회귀, history의 place_info 메시지 형식(④).
+  3. 리드에게 B8·B9 완료 보고(커밋 25bea2d 이후).
+  4. 남은 개선 후보: 2글자 장소명 오인, "궁"이 '궁금'에 걸리는 분류 단어 매칭, "다른 데 더"가 반경 밖으로만 이어질 때 문구.
 - 팀원1: B1~B6 완료(`feat/backend`). 남은 일은 팀원3(Q1·Q2) 버그 리포트 대응. Q1은 `tests/conftest.py`의 `small_catalog`·`FakeEmbedder`·`FakeSearcher`·`FakeLLM`과 `InMemoryHistoryRepo`로 `create_app(Deps(...))`를 만들면 됨(예: `tests/test_chat_service.py`).
 - 팀원3: Q1·Q2 완료(`feat/qa`, backend bed8ebc + frontend ea2ea88 병합 상태에서 확인). 남은 일 없음. 리드 병합 후 실제 휴대폰 위치 권한 팝업만 사람이 한 번 확인 권장.

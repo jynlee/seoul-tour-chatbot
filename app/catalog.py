@@ -3,7 +3,7 @@
 추천 장소 목록은 항상 이 카탈로그에서 만든다(LLM이 장소를 지어내지 않도록).
 """
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 FOOD_TYPE = "39"
@@ -48,6 +48,9 @@ class Place:
     lng: float
     image: str
     gu: str
+    # 관광공사 상세 정보 (scripts/enrich_detail.py): parking, hours, rest_day, menu, fee, reservation, pet, stroller,
+    # contact, period, place, season, discount, age, packing 중 있는 것만
+    detail: dict = field(default_factory=dict, compare=False, hash=False)
 
 
 def category_name(item: dict) -> str:
@@ -89,7 +92,7 @@ def _float(v) -> float:
         return 0.0
 
 
-def place_from_item(item: dict, tel: str = "") -> Place:
+def place_from_item(item: dict, tel: str = "", detail: dict | None = None) -> Place:
     addr = f"{item.get('addr1', '')} {item.get('addr2', '')}".strip()
     content_type = str(item.get("contenttypeid", ""))
     return Place(
@@ -105,6 +108,7 @@ def place_from_item(item: dict, tel: str = "") -> Place:
         lng=_float(item.get("mapx")),
         image=item.get("firstimage", "") or "",
         gu=_gu_of(item.get("addr1", "")),
+        detail=dict(detail or {}),
     )
 
 
@@ -126,6 +130,6 @@ def load_catalog(raw_path="data/seoul_tour.json", enriched_path="data/seoul_tour
     catalog: dict[str, Place] = {}
     for item in load_raw_items(raw_path):
         extra = enriched.get(str(item["contentid"]), {})
-        place = place_from_item(item, tel=extra.get("tel", ""))
+        place = place_from_item(item, tel=extra.get("tel", ""), detail=extra.get("detail"))
         catalog[place.id] = place
     return catalog

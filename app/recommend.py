@@ -31,7 +31,16 @@ def _matches(p: Place, intent: Intent) -> bool:
 
 
 def recommend(message: str, intent: Intent, center: Center | None, searcher, embedder,
-              catalog: dict[str, Place], k: int = 5, radius_m: float = 1500) -> Recommendation:
+              catalog: dict[str, Place], k: int = 5, radius_m: float = 1500,
+              exclude_ids: set[str] | frozenset = frozenset()) -> Recommendation:
+    """exclude_ids: 이미 보여 준 장소("다른 데 더 추천해줘"). 기준점이 장소면 그 장소 자체도 뺀다."""
+    skip = set(exclude_ids)
+    if center is not None and getattr(center, "place_id", None):
+        skip.add(center.place_id)
+
+    def ok(p: Place) -> bool:
+        return p.id not in skip and has_coords(p) and _matches(p, intent)
+
     vector = embedder.encode(message)
     hits = searcher.knn(vector, intent.content_types, intent.cat3, CANDIDATES_K)
 
@@ -39,7 +48,7 @@ def recommend(message: str, intent: Intent, center: Center | None, searcher, emb
     seen = set()
     for pid, _score in hits:  # 점수 내림차순
         p = catalog.get(pid)
-        if p is None or pid in seen or not has_coords(p) or not _matches(p, intent):
+        if p is None or pid in seen or not ok(p):
             continue
         seen.add(pid)
         candidates.append(p)
@@ -56,14 +65,14 @@ def recommend(message: str, intent: Intent, center: Center | None, searcher, emb
             # 반경 안이 1~2곳이면 같은 조건의 가장 가까운 곳으로 3곳까지 채운다 (거리·도보 시간은 그대로 보여줌)
             chosen = {p.id for p, _ in within}
             extra = sorted(((p, dist(p)) for p in catalog.values()
-                            if p.id not in chosen and has_coords(p) and _matches(p, intent)),
+                            if p.id not in chosen and ok(p)),
                            key=lambda x: x[1])
             within += extra[: MIN_PLACES - len(within)]
         within.sort(key=lambda x: x[1])
         return Recommendation(places=[to_place_out(p, d) for p, d in within])
 
     # 반경 안에 하나도 없으면: 카탈로그 전체에서 같은 조건의 가장 가까운 3곳
-    nearest = sorted(((p, dist(p)) for p in catalog.values() if has_coords(p) and _matches(p, intent)),
+    nearest = sorted(((p, dist(p)) for p in catalog.values() if ok(p)),
                      key=lambda x: x[1])[:MIN_PLACES]
     if not nearest:
         return Recommendation(places=[])
