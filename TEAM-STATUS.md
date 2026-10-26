@@ -157,10 +157,15 @@
 - 함정: "종로 관광지" 실검색 상위 5곳엔 '궁'이 든 장소가 없음 → QA-4 실서비스 확인은 "종로 역사 관광지"로(테스트는 목록에서 '궁'이 든 첫 장소를 기대값으로 씀 — 51b8c0d 뒤 순서가 바뀌어 경희궁 흥화문).
 - 51b8c0d(구 전체·관광 세부 주제) 확인(2026-10-26): `test_multiturn_api.py` +9(강서구 산책/공원 1번이 주제 맞는 곳·구 밖 장소 없음·프롬프트에 거리 표시 없음, 구 '다른 데 더'에 1.5km 안내 없음, 금천구 산책 솔직 안내(템플릿·LLM 누락 시), 한강 근처 맛집=음식점, 주제 이어받기, '궁금'은 역사 주제 아님), `test_live_multiturn.py` +3(강서습지생태공원 1번, 금천구 안내, 한강 맛집), 화면 GU-1·2. 단위 227·통합 33·JS 37·화면 19 통과.
 - b689e90 회귀(2026-10-26): 단위 229·통합 33·JS 37·화면 B8·B9 19 + Q2 24 통과. `run.mjs`는 `QA_OK`/`QA_OS_DOWN`/`QA_LLM_DOWN` 환경 변수로 주소 지정 가능(이번엔 8012/8013/8014). test-qa- 세션 남은 것 0.
-- QA-8(팀원1→리드 결정 요청, 팀원1은 B안=프론트 숨김 추천, 사소한 프롬프트 규칙은 b689e90 반영): 구 기준점일 때 거리·도보가 구 중심점 기준이라 카드 "강서구에서 약 40분"·요약 바 "강서구 근처"가 오해를 줌 → gu일 때 distance/walk null(④ 계약 변경) 또는 프론트에서 숨김 제안.
+- 2026-10-26 중단 시점(사용자 요청으로 종료): QA-8 리드 결정 ①(gu면 distance_m·walk_min null + 프론트 요약 바 "강서구 · 추천 5곳") 반영분은 **아직 병합·확인 안 함**. 확인 완료 기준은 feat/backend b689e90 + feat/frontend ea2ea88(feat/qa e6af8fb). 서버(8012~8014) 꺼짐, test-qa- 세션 0.
+- QA-8(팀원1→리드 결정 ① 확정, 백엔드 5bed7dc→2fee772(최종, d822a58 문서), 프론트 f413aea): 구 기준점일 때 거리·도보가 구 중심점 기준이라 카드 "강서구에서 약 40분"·요약 바 "강서구 근처"가 오해를 줌 → gu일 때 distance/walk null(④ 계약 변경) 또는 프론트에서 숨김 제안.
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
 - 팀원1 (2026-10-26): B7 데이터 574/574 ✅, 개선 3개(2글자 장소명·"궁" 단어 경계·"다른 데 더" 먼 곳 안내) ✅, QA-4~7 수정 ✅(팀원3 재확인 대기), 구 기준점 전체 검색·관광 세부 주제(산책·역사·전시·쇼핑·체험·야경) ✅. 남은 일: 팀원3 QA의 B8·B9 버그 리포트 대응. 남은 개선 후보: 3글자 장소명 오인(⑦ 참고).
 - 팀원1: B1~B6 완료(`feat/backend`). 남은 일은 팀원3(Q1·Q2) 버그 리포트 대응. Q1은 `tests/conftest.py`의 `small_catalog`·`FakeEmbedder`·`FakeSearcher`·`FakeLLM`과 `InMemoryHistoryRepo`로 `create_app(Deps(...))`를 만들면 됨(예: `tests/test_chat_service.py`).
-- 팀원3: Q1·Q2, B8·B9 검증 완료(b689e90 기준, 구 전체·세부 주제 포함). QA-8 리드 결정·수정이 오면 merge 후 테스트 기대값 맞추고 `pytest`·`run_b89.mjs`(8012)로 회귀 확인. 리드 병합 후 실제 휴대폰 위치 권한 팝업만 사람이 한 번 확인 권장.
+- 팀원3 다음에 바로 할 일 (2026-10-26 중단 시점, QA-8 확인):
+  1. worktree `agent-a3b7fc5a951212262`(feat/qa)에서 `git merge origin/feat/backend`(2fee772 이상) + `git merge origin/feat/frontend`(f413aea 이상). TEAM-STATUS 충돌은 양쪽 살리기.
+  2. 테스트 기대값 맞추기(QA-8 최종 규칙, ④ 참고): 기준점이 구면 places의 `distance_m`·`walk_min`이 null, 구 결과 뒤 "다른 데 더"·"카페는?"도 center.source=`gu`(이전엔 history). 고칠 곳 예상: `tests/api/test_multiturn_api.py`의 `test_gu_wide_may_exceed_radius`(distance>1500 검사 → null 검사로), `test_topic_carried_to_more`·`test_gu_wide_more_has_no_far_notice`(center.source gu 추가 검사), `tests/api/test_chat_api.py`의 `assert_contract`(center 있으면 거리 int라는 가정 → gu면 null 허용), `tests/integration/test_live_api.py::test_live_area_and_gu`. 새 테스트: gu 첫 턴·이어받은 턴 모두 거리 null, area/place/gps는 거리 int 유지, 명동(area) 이어받기는 source history.
+  3. 화면: `run_b89.mjs` GU-1 기대를 요약 바 "강서구 · 추천 5곳"('근처' 없음)·카드에 🚶 도보 줄 없음·칩에 분 없음으로 바꾸고, 8012로 `run_b89.mjs` + 8012/8013/8014로 `run.mjs`(QA_OK/QA_OS_DOWN/QA_LLM_DOWN) 재실행.
+  4. 단위·통합·JS·화면 전체 → manual-qa(QA-8 처리·GU 항목)·TEAM-STATUS 갱신 → 커밋·push → 리드에게 보고(리드가 그 결과로 main 병합). 리드 병합 후 실제 휴대폰 위치 권한 팝업만 사람이 한 번 확인 권장.
