@@ -6,7 +6,7 @@ import pytest
 from app.catalog import load_catalog
 from app.chat import ChatService, Deps
 from app.history import InMemoryHistoryRepo
-from app.llm import CLARIFY_ANSWER, info_template_answer
+from app.llm import CLARIFY_ANSWER, ORDINAL_OUT_OF_RANGE, info_template_answer
 from app.schemas import ChatRequest
 from tests.conftest import FakeEmbedder, FakeLLM, FakeSearcher
 
@@ -184,3 +184,41 @@ def test_short_title_common_word_not_center(real_catalog):
     assert r.center is None
     r = s.say("기후 맛집 근처 카페")
     assert r.center.label == "기후"
+
+
+# ---------------- QA-4~7 ----------------
+
+def test_qa4_palace_in_title(real_catalog):
+    s = Session(real_catalog, llm=FakeLLM(fail=True))
+    r1 = s.say("종로 관광지")
+    palace = next(p.title for p in r1.places if "궁" in p.title)
+    r = s.say("아까 그 궁 주차돼?")
+    assert r.answer.startswith(palace)
+
+
+def test_qa5_ordinal_out_of_range_asks_back(real_catalog):
+    s = Session(real_catalog)
+    r1 = s.say("성수 카페")
+    n = len(r1.places)
+    r = s.say(f"{n + 1}번째 거 어디야?")
+    assert r.places == [] and r.center is None
+    assert r.answer == ORDINAL_OUT_OF_RANGE.format(n=n)
+
+
+def test_qa6_demonstrative_without_context_asks_back(real_catalog):
+    s = Session(real_catalog)
+    assert s.say("주차 가능해?").answer == CLARIFY_ANSWER
+    r = s.say("거기 어디야?")
+    assert r.answer == CLARIFY_ANSWER and r.places == [] and r.center is None
+    r = Session(real_catalog).say("거기 어디야?")
+    assert r.answer == CLARIFY_ANSWER and r.places == []
+
+
+def test_qa7_earlier_list_reference(real_catalog):
+    s = Session(real_catalog, llm=FakeLLM(fail=True))
+    r1 = s.say("명동 맛집 추천해줘")
+    s.say("광화문 근처 관광지")
+    r = s.say("아까 그 식당 몇 시에 열어?")
+    # 이전 맛집 목록 중 한 곳(이름에 '식당'이 든 곳이 있으면 그곳)에 대한 답
+    assert any(r.answer.startswith(f"{p.title} —") for p in r1.places)
+    assert r.places == []

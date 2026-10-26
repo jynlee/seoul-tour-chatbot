@@ -85,6 +85,7 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
 
 CLARIFY_ANSWER = "어느 곳을 말씀하시는지 알려주세요. 장소 이름을 말하거나 지도에서 핀을 눌러 주시면 알려드릴게요."
 NO_MORE_ANSWER = "{label} 조건으로 더 보여드릴 곳이 없어요. 다른 지역이나 종류로 물어봐 주세요."
+ORDINAL_OUT_OF_RANGE = "목록에는 {n}곳까지 있어요. 몇 번째 장소인지 다시 알려 주세요."
 FAR_MORE_NOTICE = "{label} 근처(1.5km 안)에는 더 보여드릴 곳이 없어서 조금 떨어진 곳을 골랐어요."
 
 
