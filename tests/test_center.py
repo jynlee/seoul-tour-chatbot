@@ -98,3 +98,33 @@ def test_history_fallback(small_catalog):
 
 def test_none(small_catalog):
     assert _resolve(small_catalog, "맛집 추천해줘") is None
+
+
+# ---- 2글자 장소명: 일반 단어로 쓰이면 기준점이 아님 ----
+
+def _with_short_titles(small_catalog):
+    import dataclasses
+
+    catalog = dict(small_catalog)
+    base = small_catalog["2622715"]  # 감꽃당(카페) 좌표를 빌려 씀
+    for pid, title in (("2901568", "기후"), ("2870486", "길목")):
+        catalog[pid] = dataclasses.replace(base, id=pid, title=title)
+    return catalog
+
+
+def test_short_title_as_whole_message_or_place_usage(small_catalog):
+    catalog = _with_short_titles(small_catalog)
+    assert _resolve(catalog, "기후").label == "기후"
+    assert _resolve(catalog, "기후?").label == "기후"
+    assert _resolve(catalog, "기후 맛집").label == "기후"
+    assert _resolve(catalog, "기후 근처 카페 있어?").label == "기후"
+    assert _resolve(catalog, "길목에서 가까운 카페").label == "길목"
+    assert _resolve(catalog, "구펠 주변 관광지").label == "구펠"
+
+
+def test_short_title_as_common_word_is_ignored(small_catalog):
+    catalog = _with_short_titles(small_catalog)
+    assert _resolve(catalog, "기후 변화 걱정 없는 실내 관광지 추천해줘") is None
+    assert _resolve(catalog, "요즘 서울 기후 어때?") is None
+    assert _resolve(catalog, "골목길목 분위기 좋은 카페") is None
+    assert _resolve(catalog, "길목마다 맛집이 있는 곳") is None

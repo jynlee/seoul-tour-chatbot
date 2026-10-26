@@ -15,13 +15,13 @@ from typing import Any
 
 from app.center import Center, has_named_area, resolve_center
 from app.dialog import (
-    asked_fields, focus_place_id, format_history, info_value, intent_from_places, is_explain, is_more_request,
-    is_near, resolve_reference,
+    asked_fields, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
+    intent_from_places, is_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference,
 )
 from app.intent import CASUAL_RESPONSES, detect_intent
 from app.llm import (
-    CLARIFY_ANSWER, NO_MORE_ANSWER, LLMUnavailable, build_info_prompt, build_prompt, info_template_answer,
-    template_answer,
+    CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, LLMUnavailable, all_far, build_info_prompt, build_prompt,
+    info_template_answer, mentions_far, template_answer,
 )
 from app.recommend import recommend
 from app.schemas import CenterOut, ChatRequest, ChatResponse
@@ -72,12 +72,17 @@ class ChatService:
         focus_id = focus_place_id(messages, last_places, catalog)
         near = is_near(msg)
         more = is_more_request(msg)
-        ref = resolve_reference(msg, req.selected_place_id, last_places, focus_id, catalog, near=near)
+        ref = resolve_reference(msg, req.selected_place_id, last_places, focus_id, catalog, near=near,
+                                earlier_lists=earlier_place_lists(messages))
         fields = asked_fields(msg)
         history_texts = format_history(messages)
 
         # 1) 장소 정보 질문
         if not near and not more:
+            if ordinal_out_of_range(msg, last_places):
+                return self._reply(sid, msg, ORDINAL_OUT_OF_RANGE.format(n=len(last_places)))
+            if ref is None and has_demonstrative(msg) and is_explain(msg):
+                return self._reply(sid, msg, CLARIFY_ANSWER)  # "거기 어디야?"인데 가리킬 장소가 없음
             asks_about_ref = ref is not None and (ref.kind in ("ordinal", "partial") or is_explain(msg))
             if fields or asks_about_ref:
                 return self._place_info(sid, msg, ref, fields, history_texts)
@@ -104,13 +109,20 @@ class ChatService:
         if more and not rec.places:
             return self._reply(sid, msg, NO_MORE_ANSWER.format(label=f"{label} 근처" if label else "이"))
 
+        # "다른 데 더"인데 남은 곳이 모두 반경 밖이면 멀다는 사실을 꼭 알린다 (LLM이 빠뜨리면 안내 문장을 앞에 붙임)
+        far_notice = FAR_MORE_NOTICE.format(label=label) if more and label and all_far(rec.places) else None
         try:
             answer = self.deps.llm.generate(
-                build_prompt(msg, history_texts, rec.places, label, rec.fallback_note, more=more))
+                build_prompt(msg, history_texts, rec.places, label, rec.fallback_note, more=more,
+                             far_notice=far_notice))
+            if far_notice and not mentions_far(answer):
+                answer = f"{far_notice} {answer}"
         except LLMUnavailable:
-            answer = template_answer(rec.places, label)
+            answer = template_answer(rec.places, label, far=far_notice is not None)
             if rec.fallback_note and rec.places:
                 answer = f"{answer} ({rec.fallback_note})"
+            if far_notice:
+                answer = f"{far_notice} {answer}"
         return self._reply(sid, msg, answer, center=center_out, places=rec.places)
 
     @staticmethod

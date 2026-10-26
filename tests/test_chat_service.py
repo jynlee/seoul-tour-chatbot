@@ -110,3 +110,64 @@ def test_api_health(client, deps):
     assert client.get("/api/health").json() == {"opensearch": True, "ollama": True, "mysql": True}
     deps.llm.fail = True
     assert client.get("/api/health").json()["ollama"] is False
+
+
+# ---- "다른 데 더"가 반경 밖 장소로만 이어질 때 ----
+
+def _far_cafe_catalog(small_catalog):
+    import dataclasses
+
+    catalog = dict(small_catalog)
+    base = small_catalog["2895236"]  # 구펠(성수) — 인사동에서 약 6km
+    for i in range(4):
+        pid = f"88800{i}"
+        catalog[pid] = dataclasses.replace(base, id=pid, title=f"성수카페{i}", lng=base.lng + 0.001 * (i + 1))
+    return catalog
+
+
+def _far_service(catalog, llm):
+    from app.chat import ChatService, Deps
+    from app.history import InMemoryHistoryRepo
+    from tests.conftest import FakeEmbedder, FakeSearcher
+
+    return ChatService(Deps(catalog=catalog, embedder=FakeEmbedder(), searcher=FakeSearcher(catalog),
+                            llm=llm, history=InMemoryHistoryRepo()))
+
+
+def test_more_only_far_places_says_so(small_catalog):
+    from app.schemas import ChatRequest
+    from tests.conftest import FakeLLM
+
+    catalog = _far_cafe_catalog(small_catalog)
+    llm = FakeLLM("성수 쪽 카페들이에요.")
+    svc = _far_service(catalog, llm)
+    r1 = svc.handle(ChatRequest(message="인사동 카페 추천해줘"))
+    assert r1.places[0].title == "감꽃당"
+    r2 = svc.handle(ChatRequest(session_id=r1.session_id, message="다른 데 더 추천해줘"))
+    assert r2.places and all(p.distance_m > 1500 for p in r2.places)
+    assert r2.answer.startswith("인사동 근처(1.5km 안)에는 더 보여드릴 곳이 없어서 조금 떨어진 곳을 골랐어요.")
+    assert r2.answer.endswith("성수 쪽 카페들이에요.")
+    assert "1.5km" in llm.prompts[-1] and "근처'라고 하지 말" in llm.prompts[-1]
+
+
+def test_more_only_far_places_llm_already_says_far(small_catalog):
+    # LLM 답이 이미 멀다는 걸 말하면 안내를 또 붙이지 않음 (같은 말 두 번 방지)
+    from app.schemas import ChatRequest
+    from tests.conftest import FakeLLM
+
+    svc = _far_service(_far_cafe_catalog(small_catalog), FakeLLM("근처엔 없어서 6km 떨어진 성수 카페를 골랐어요."))
+    r1 = svc.handle(ChatRequest(message="인사동 카페 추천해줘"))
+    r2 = svc.handle(ChatRequest(session_id=r1.session_id, message="다른 데 더 추천해줘"))
+    assert r2.answer == "근처엔 없어서 6km 떨어진 성수 카페를 골랐어요."
+
+
+def test_more_only_far_places_template_when_llm_down(small_catalog):
+    from app.schemas import ChatRequest
+    from tests.conftest import FakeLLM
+
+    svc = _far_service(_far_cafe_catalog(small_catalog), FakeLLM(fail=True))
+    r1 = svc.handle(ChatRequest(message="인사동 카페 추천해줘"))
+    r2 = svc.handle(ChatRequest(session_id=r1.session_id, message="다른 데 더 추천해줘"))
+    assert r2.answer.startswith("인사동 근처(1.5km 안)에는 더 보여드릴 곳이 없어서 조금 떨어진 곳을 골랐어요.")
+    assert "근처 추천 장소" not in r2.answer
+    assert "km 떨어진" in r2.answer

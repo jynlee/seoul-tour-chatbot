@@ -42,9 +42,10 @@ MORE_KEYWORDS = ("다른 데", "다른데", "다른 곳", "다른곳", "더 추�
 # ---- 지칭 ----
 REF_DEMONSTRATIVES = ("거기", "그곳", "여기", "이곳", "저기", "저곳", "그 집", "그집", "저 집", "그 근처", "그 주변")
 REF_MARKERS = ("아까", "방금", "그 ", "저 ")
-_ORDINAL_WORD = re.compile(r"(첫|두|둘|세|셋|네|넷|다섯)\s*(?:번\s*)?째")
-_ORDINAL_NUM = re.compile(r"(?<!\d)([1-5])\s*번(?!\s*출구)")
-_ORDINAL_INDEX = {"첫": 0, "두": 1, "둘": 1, "세": 2, "셋": 2, "네": 3, "넷": 3, "다섯": 4}
+_ORDINAL_WORD = re.compile(r"(첫|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉|열)\s*(?:번\s*)?째")
+_ORDINAL_NUM = re.compile(r"(?<!\d)([1-9]|10)\s*번(?!\s*출구)")
+_ORDINAL_INDEX = {"첫": 0, "두": 1, "둘": 1, "세": 2, "셋": 2, "네": 3, "넷": 3, "다섯": 4,
+                  "여섯": 5, "일곱": 6, "여덟": 7, "아홉": 8, "열": 9}
 # 이름 일부로 찾을 때 무시하는 흔한 말
 _STOP_SUBSTRINGS = ("근처", "주변", "맛집", "추천", "알려", "어디", "거기")
 # "아까 그 카페" → 분류 일치
@@ -55,10 +56,23 @@ _CATEGORY_WORDS = {
     "궁": "역사관광지", "쇼핑": "쇼핑", "시장": "쇼핑", "축제": "축제", "공연": "공연/행사",
 }
 _KIND_WORDS = {"식당": "food", "맛집": "food", "음식점": "food", "밥집": "food", "관광지": "tour", "명소": "tour"}
+# 한 글자 분류 단어('궁')는 '궁금'처럼 다른 낱말 속에 흔히 들어간다 → 뒤가 끝·한글 아님·조사일 때만 인정
+_PARTICLES = ("은", "는", "이", "가", "을", "를", "에", "도", "만", "로", "으로", "랑", "의", "였")
+_HANGUL = re.compile(r"[가-힣]")
 
 
 def _has(message: str, words) -> bool:
     return any(w in message for w in words)
+
+
+def _has_word(message: str, word: str) -> bool:
+    if len(word) > 1:
+        return word in message
+    for m in re.finditer(re.escape(word), message):
+        rest = message[m.end():]
+        if not rest or not _HANGUL.match(rest[0]) or rest.startswith(_PARTICLES):
+            return True
+    return False
 
 
 def asked_fields(message: str) -> list[str]:
@@ -115,9 +129,12 @@ def _partial_match(message: str, last_places: list[PlaceOut], use_category: bool
         score = _longest_title_substring(p.title, message)
         score = score if score >= 2 else 0
         if use_category:
-            if any(w in message and p.category == cat for w, cat in _CATEGORY_WORDS.items()):
+            compact = p.title.replace(" ", "")
+            if any(w in compact and _has_word(message, w) for w in _CATEGORY_WORDS):
+                score = max(score, 2.5)  # "아까 그 궁" → 이름에 '궁'이 든 곳이 같은 분류의 다른 곳보다 우선
+            elif any(p.category == cat and _has_word(message, w) for w, cat in _CATEGORY_WORDS.items()):
                 score = max(score, 2)
-            elif any(w in message and p.kind == kind for w, kind in _KIND_WORDS.items()):
+            elif any(p.kind == kind and _has_word(message, w) for w, kind in _KIND_WORDS.items()):
                 score = max(score, 1)
         if score > best_score:
             best, best_score = p, score
@@ -125,8 +142,12 @@ def _partial_match(message: str, last_places: list[PlaceOut], use_category: bool
 
 
 def resolve_reference(message: str, selected_place_id: str | None, last_places: list[PlaceOut],
-                      focus_id: str | None, catalog: dict[str, Place], near: bool = False) -> Reference | None:
-    """질문이 가리키는 장소. 순서 > 장소 이름 > '아까 그 ○○' > '거기'(선택한 곳 → 방금 설명한 곳 → 직전 첫 장소)."""
+                      focus_id: str | None, catalog: dict[str, Place], near: bool = False,
+                      earlier_lists: list[list[PlaceOut]] = ()) -> Reference | None:
+    """질문이 가리키는 장소. 순서 > 장소 이름 > '아까 그 ○○' > '거기'(선택한 곳 → 방금 설명한 곳 → 직전 첫 장소).
+
+    earlier_lists: 직전보다 앞선 추천 목록들(최근 것부터). '아까 그 ○○'가 직전 목록에 없을 때만 찾아본다.
+    """
     def from_out(p: PlaceOut | None, kind: str) -> Reference | None:
         if p is not None and p.id in catalog:
             return Reference(catalog[p.id], kind)
@@ -146,10 +167,11 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
         return Reference(named, "title")
 
     # 3) "아까 그 카페", "그 삼계탕집"
-    if last_places and _has(message, REF_MARKERS):
-        ref = from_out(_partial_match(message, last_places, use_category=not near), "partial")
-        if ref is not None:
-            return ref
+    if _has(message, REF_MARKERS):
+        for places in ([last_places] if last_places else []) + list(earlier_lists):
+            ref = from_out(_partial_match(message, places, use_category=not near), "partial")
+            if ref is not None:
+                return ref
 
     # 4) "거기/그곳/그 집": 선택한 장소 → 방금 설명한 장소 → 직전 추천의 첫 장소
     if _has(message, REF_DEMONSTRATIVES):
@@ -162,6 +184,22 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
         if last_places:
             return from_out(last_places[0], "demonstrative")
     return None
+
+
+def ordinal_out_of_range(message: str, last_places: list[PlaceOut]) -> bool:
+    """"6번째 거"처럼 직전 목록 범위를 넘는 순서 지칭."""
+    idx = ordinal_index(message)
+    return idx is not None and bool(last_places) and not -len(last_places) <= idx < len(last_places)
+
+
+def earlier_place_lists(messages: list[HistoryMessage]) -> list[list[PlaceOut]]:
+    """마지막 추천보다 앞선 추천 목록들 (최근 것부터)."""
+    lists = [m.places for m in messages if m.role == "assistant" and m.places]
+    return lists[-2::-1]
+
+
+def has_demonstrative(message: str) -> bool:
+    return _has(message, REF_DEMONSTRATIVES)
 
 
 def focus_place_id(messages: list[HistoryMessage], last_places: list[PlaceOut],

@@ -68,3 +68,36 @@ def test_format_history_includes_place_names(small_catalog):
     lines = format_history(msgs)
     assert lines[0] == "사용자: 광화문 맛집"
     assert "광화문 세종클럽, 개성만두 궁" in lines[1] and "기준점: 광화문" in lines[1]
+
+
+def test_category_word_needs_word_boundary(small_catalog):
+    # '궁금'의 '궁'은 분류 단어(궁=역사관광지)가 아님
+    last = _last(small_catalog, "2733967", "2622715")  # 가회동성당(역사관광지), 감꽃당(카페)
+    r = resolve_reference("궁금한 게 있는데 저 카페 주차 돼?", None, last, None, small_catalog)
+    assert r.place.title == "감꽃당"
+    assert resolve_reference("아까 그 궁 어디야?", None, last, None, small_catalog).place.title == "가회동성당"
+    assert resolve_reference("아까 그 궁은 몇 시에 열어?", None, last, None, small_catalog).place.title == "가회동성당"
+    assert resolve_reference("그 궁금한 데 말이야", None, _last(small_catalog, "2733967"), None,
+                             small_catalog) is None
+
+
+def test_category_word_in_title_beats_category(small_catalog):
+    # QA-4: "아까 그 궁"은 이름에 '궁'이 든 장소가 같은 분류의 첫 장소보다 우선
+    last = _last(small_catalog, "2733967", "398373")  # 가회동성당(역사관광지), 개성만두 궁
+    assert resolve_reference("아까 그 궁 주차돼?", None, last, None, small_catalog).place.title == "개성만두 궁"
+
+
+def test_ordinal_beyond_five():
+    assert ordinal_index("6번째 거 어디야?") == 5
+    assert ordinal_index("여섯 번째 거") == 5
+    assert ordinal_index("10번 어때") == 9
+    assert ordinal_index("6번 출구 근처") is None
+
+
+def test_partial_reference_searches_earlier_lists(small_catalog):
+    # QA-7: 직전 목록에 없으면 그 전 추천 목록에서 찾음
+    last = _last(small_catalog, "126512", "775394")  # 관광지만
+    earlier = [_last(small_catalog, "398373", "2622715")]
+    r = resolve_reference("아까 그 식당 몇 시에 열어?", None, last, None, small_catalog, earlier_lists=earlier)
+    assert r.place.title == "개성만두 궁"
+    assert resolve_reference("아까 그 식당 몇 시에 열어?", None, last, None, small_catalog) is None
