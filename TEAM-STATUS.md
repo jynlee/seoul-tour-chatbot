@@ -29,8 +29,8 @@
 | B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ✅ 팀원1 |
 | B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ✅ 팀원1 |
 | B7 | 관광공사 상세 정보 보강(detailIntro2 → detail) | 팀원1 | B1 | 🔄 팀원1 (코드 ✅, 데이터 469/574 — 일일 한도, 다음 날 이어서) |
-| B8 | 장소 정보 질문 의도(place_info) | 팀원1 | B6, B7 | ✅ 팀원1 (팀원3 검증 대기) |
-| B9 | 멀티턴(순서·이름 지칭, "다른 데 더", 조건 이어받기, 프롬프트에 최근 대화) | 팀원1 | B8 | ✅ 팀원1 (팀원3 검증 대기) |
+| B8 | 장소 정보 질문 의도(place_info) | 팀원1 | B6, B7 | ✅ 팀원1 · 🔄 팀원3 검증(시나리오 통과, QA-4~7 대응 대기) |
+| B9 | 멀티턴(순서·이름 지칭, "다른 데 더", 조건 이어받기, 프롬프트에 최근 대화) | 팀원1 | B8 | ✅ 팀원1 · 🔄 팀원3 검증(시나리오 통과, QA-4~7 대응 대기) |
 | F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ✅ 팀원2 |
 | F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ✅ 팀원2 |
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ✅ 팀원2 |
@@ -70,7 +70,6 @@
 - 팀원1 backend: `aba34c491b89ebbac`
 - 팀원2 frontend: `a3f8272f943c570fa` (팀원1이 리드에게 받아 기록)
 - 팀원3 qa: `a3b7fc5a951212262` (팀원1이 리드에게 받아 기록)
-- 팀원1 backend: `aba34c491b89ebbac`
 
 ### 리드
 - T0 완료: `app/config.py`(Settings·load_settings·ConfigError), `app/schemas.py`, `pytest.ini`(integration 마커), `requirements.txt`(설치 확인됨), `.env.example`, `data/seoul_tour.json`(원본 복사, 수정 금지).
@@ -131,6 +130,10 @@
 - Q2 완료: `docs/manual-qa.md` 24개 항목 모두 통과(헤드리스 Chrome iPhone 14 Pro 393x852, 실서비스). 자동 점검 스크립트 `scripts/qa_mobile/run.mjs`(CDP, Node 24 내장 WebSocket): 8011 정상 / 8012 `OPENSEARCH_PORT=9299`(503) / 8013 `OLLAMA_URL=http://localhost:11999`(템플릿). `tests/integration/test_live_chat.py` 3건 추가. 스크린샷: `C:\Users\SMT03\AppData\Local\Temp\claude\C--Users-SMT03-SeoulTourChatbot\796dbd34-6ee3-48fe-b2a5-1247492df3b8\scratchpad\shots\01~14-*.png`.
 - 버그 QA-2(팀원1, bed8ebc): 기준점 없을 때 "근처/주변"·지어낸 동네 이름, 기준점 대신 이전 지역명 → 프롬프트 보강, 재확인 통과(LLM 문구라 완전 보장은 아님). QA-3(팀원2, ea2ea88): 넓은 범위 지도에서 랜드마크끼리·핀과 겹침 → 겹치는 랜드마크 생략, 재확인 통과.
 - 함정: 점검용 화면에서 만든 대화 기록은 UUID 세션이라 `test-qa-` 접두가 아님 → `results.json`의 `sessions`를 `delete_session()`으로 지움(완료).
+- B8·B9 검증(2026-10-26, feat/backend 9f38d69 병합): `tests/api/test_multiturn_api.py`(가짜 의존성 + 실제 카탈로그 22건: 세션1·2, 정보 질문 이름/거기+선택/거기+첫 장소/정보 없음/LLM 다운/대상 없음, "거기 근처 카페"·"3번 출구" 회귀, history place_info 형식, "다른 데 더" 소진) + `tests/integration/test_live_multiturn.py`(실서비스 7건, Ollama만 끈 앱 포함) + 화면 `scripts/qa_mobile/run_b89.mjs`(14항목 통과, manual-qa B8·B9 절). 단위 177·통합 27·JS 37 통과.
+- B9 반영해 기존 `test_tel_present_passes_through` 수정: 기준점이 된 장소는 결과에서 빠지므로 "가회동성당 근처" 대신 "종로 관광지"로 조회.
+- 버그 QA-4~7(팀원1에게 보냄): "아까 그 궁"→같은 분류 첫 장소, 범위 밖 순서("6번째")→재추천, 맥락 없는 "거기 어디야?"→아무 관광지 추천, "아까 그 식당"이 직전 목록만 봄(경미).
+- 함정: 지도 핀의 DOM 순서는 응답 순서와 다름(그리는 순서). "두 번째" 검증은 응답/기록 순서나 접힘 칩 순서로 할 것.
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
@@ -140,4 +143,4 @@
   3. 리드에게 B8·B9 완료 보고(커밋 25bea2d 이후).
   4. 남은 개선 후보: 2글자 장소명 오인, "궁"이 '궁금'에 걸리는 분류 단어 매칭, "다른 데 더"가 반경 밖으로만 이어질 때 문구.
 - 팀원1: B1~B6 완료(`feat/backend`). 남은 일은 팀원3(Q1·Q2) 버그 리포트 대응. Q1은 `tests/conftest.py`의 `small_catalog`·`FakeEmbedder`·`FakeSearcher`·`FakeLLM`과 `InMemoryHistoryRepo`로 `create_app(Deps(...))`를 만들면 됨(예: `tests/test_chat_service.py`).
-- 팀원3: Q1·Q2 완료(`feat/qa`, backend bed8ebc + frontend ea2ea88 병합 상태에서 확인). 남은 일 없음. 리드 병합 후 실제 휴대폰 위치 권한 팝업만 사람이 한 번 확인 권장.
+- 팀원3: Q1·Q2 완료. B8·B9 검증 시나리오 통과, QA-4~7 팀원1 수정 대기 → push되면 merge 후 `pytest`·`run_b89.mjs`(8012) 재확인. 리드 병합 후 실제 휴대폰 위치 권한 팝업만 사람이 한 번 확인 권장.
