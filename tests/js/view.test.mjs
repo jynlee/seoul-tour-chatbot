@@ -59,6 +59,18 @@ test('접힘 요약 바: "{label} 근처 · 추천 N곳"', () => {
   assert.equal((html.match(/<i /g) || []).length, 2);
 });
 
+test('접힘 요약 바: 구 전체 기준(gu)이면 "근처" 없이 "강서구 · 추천 N곳"', () => {
+  const gu = { lat: 37.5509, lng: 126.8495, label: '강서구', source: 'gu' };
+  assert.match(foldBarHtml(gu, [GUNG]), /<b>강서구<\/b><span> · 추천 1곳<\/span>/);
+  assert.match(foldBarHtml({ ...gu, label: '성수', source: 'area' }, [GUNG]), /<b>성수 근처<\/b>/);
+});
+
+test('도보 정보가 null이면(구 전체 기준) 칩·카드에서 도보 표시 숨김', () => {
+  const p = { ...GUNG, distance_m: null, walk_min: null };
+  assert.equal(chipLabel(p), '🍽️ 개성만두 궁');
+  assert.doesNotMatch(cardHtml(p, { centerLabel: '강서구' }), /🚶|약 .*분/);
+});
+
 test('접힘 요약 바: 기준점이 없으면 "추천 장소"', () => {
   assert.match(foldBarHtml(null, [GUNG]), /<b>추천 장소<\/b><span> · 추천 1곳<\/span>/);
 });
