@@ -6,8 +6,11 @@ from typing import Protocol
 
 from app.catalog import Place
 
-PROTECTED_INDEXES = {"seoul-tour"}  # 기존 프로젝트 인덱스: 절대 건드리지 않음
+PROTECTED_INDEXES = {"seoul-tour", "food-materials"}  # 다른 프로젝트 인덱스: 읽지도 쓰지도 않음
+WRITE_PROTECTED_INDEXES = PROTECTED_INDEXES | {"seoul-tour-v2"}  # 574곳 확인 서버가 쓰는 인덱스: 다시 만들지 않음
 VECTOR_DIM = 768
+# 임베딩 모델 최대 128토큰: 기존 문장이 약 32토큰이라 개요는 앞부분 150자(약 90토큰)만 붙인다
+OVERVIEW_CHARS = 150
 
 _KIND_WORD = {"food": "음식점", "tour": "관광지", "event": "축제/행사"}
 
@@ -21,27 +24,38 @@ class Embedder(Protocol):
 
 
 class Searcher(Protocol):
-    def knn(self, vector: list[float], content_types: set[str], cat3: str | None, k: int) -> list[tuple[str, float]]: ...
+    def knn(self, vector: list[float], content_types: set[str], cat3: str | None, k: int,
+            near: tuple[float, float, float] | None = None) -> list[tuple[str, float]]: ...
 
 
-def index_name_guard(name: str) -> str:
-    if not name or name.strip() in PROTECTED_INDEXES:
-        raise ValueError(f"이 인덱스 이름은 쓸 수 없어요: {name!r} (기존 seoul-tour 보호)")
+def index_name_guard(name: str, write: bool = False) -> str:
+    """write=True(인덱스 삭제·생성)면 seoul-tour-v2 도 거부."""
+    protected = WRITE_PROTECTED_INDEXES if write else PROTECTED_INDEXES
+    if not name or name.strip() in protected:
+        raise ValueError(f"이 인덱스 이름은 쓸 수 없어요: {name!r} (보호: {', '.join(sorted(protected))})")
     return name
 
 
 def build_document_text(p: Place) -> str:
-    """임베딩용 문장 (기존 vectorize.py 문장 + 분류 한글명)."""
+    """임베딩용 문장 (기존 vectorize.py 문장 + 분류 한글명 + 개요 앞부분)."""
     kind_word = _KIND_WORD.get(p.kind, "관광지")
     where = f"서울 {p.gu}" if p.gu else "서울"
-    return (f"{p.title}는 {where}에 위치한 {kind_word}입니다. "
+    text = (f"{p.title}는 {where}에 위치한 {kind_word}입니다. "
             f"분류는 {p.category}이며 주소는 {p.addr}입니다.")
+    overview = p.overview.strip()[:OVERVIEW_CHARS]
+    return f"{text} {overview}" if overview else text
 
 
-def build_query(vector: list[float], content_types: set[str], cat3: str | None, k: int) -> dict:
+def build_query(vector: list[float], content_types: set[str], cat3: str | None, k: int,
+                near: tuple[float, float, float] | None = None) -> dict:
+    """near=(위도, 경도, 반경 m): 그 반경 안 장소에서만 kNN (lucene 엔진은 필터를 걸고 k개를 찾음 — 상위 k개를 먼저
+    뽑고 거르면 장소가 많은 동네에서 가까운 곳이 빠짐)."""
     filters: list[dict] = [{"terms": {"content_type": sorted(content_types)}}]
     if cat3:
         filters.append({"term": {"cat3": cat3}})
+    if near is not None:
+        lat, lng, radius_m = near
+        filters.append({"geo_distance": {"distance": f"{radius_m:g}m", "location": {"lat": lat, "lon": lng}}})
     return {
         "size": k,
         "_source": ["id"],
@@ -112,9 +126,9 @@ class OpenSearchSearcher:
         self._index = index_name_guard(settings.opensearch_index)
         self._client = client or make_client(settings)
 
-    def knn(self, vector, content_types, cat3, k):
+    def knn(self, vector, content_types, cat3, k, near=None):
         try:
-            result = self._client.search(index=self._index, body=build_query(vector, content_types, cat3, k))
+            result = self._client.search(index=self._index, body=build_query(vector, content_types, cat3, k, near))
         except Exception as e:  # 연결 실패·인덱스 없음 등 모두 검색 불가로 본다
             raise SearchUnavailable(str(e)) from e
         return [(hit["_source"]["id"], float(hit["_score"])) for hit in result["hits"]["hits"]]

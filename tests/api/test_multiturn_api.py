@@ -18,6 +18,7 @@ from app.llm import (
 )
 from app.main import create_app
 from tests.conftest import SMALL_PLACES, FakeEmbedder, FakeLLM, FakeSearcher
+from tests.conftest import CATALOG_574
 
 GOREO = "고려삼계탕"
 GAESEONG = "개성만두 궁"
@@ -26,7 +27,7 @@ GAESEONG = "개성만두 궁"
 @pytest.fixture(scope="module")
 def real_catalog(tmp_path_factory):
     """실제 카탈로그(상세 정보 없이) + 시험용 detail: 고려삼계탕은 주차 정보 없음, 개성만두 궁은 주차 '불가능'."""
-    catalog = load_catalog("data/seoul_tour.json", tmp_path_factory.mktemp("qa") / "none.json")
+    catalog = load_catalog(CATALOG_574, tmp_path_factory.mktemp("qa") / "none.json")
     by_title = {p.title: p for p in catalog.values()}
     gs = by_title[GOREO]
     catalog[gs.id] = dataclasses.replace(gs, tel="02-752-9376", detail={"hours": "10:00~22:00", "menu": "삼계탕"})

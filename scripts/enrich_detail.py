@@ -7,6 +7,9 @@
     {contentid: {"tel": "...", "detail": {"parking": "...", "hours": "...", ...}}}
 한 건마다 저장하므로 중간에 끊겨도 다시 실행하면 detail 이 있는 건은 건너뛴다.
 원본 data/seoul_tour.json 은 수정하지 않는다.
+
+데이터 확장(새 장소만, 중간 파일에):
+    python scripts/enrich_detail.py --raw data/raw/seoul_merged.json --out data/raw/detail.json         --skip-from data/seoul_tour_enriched.json
 """
 import argparse
 import json
@@ -113,6 +116,7 @@ def main(argv=None) -> int:
     parser.add_argument("--raw", default=str(ROOT / "data" / "seoul_tour.json"))
     parser.add_argument("--out", default=str(ROOT / "data" / "seoul_tour_enriched.json"))
     parser.add_argument("--sleep", type=float, default=0.1)
+    parser.add_argument("--skip-from", default=None, help="이 enriched 파일에 detail 이 이미 있는 장소는 건너뜀")
     args = parser.parse_args(argv)
 
     try:
@@ -125,6 +129,8 @@ def main(argv=None) -> int:
     out = Path(args.out)
     enriched = load_enriched(out)
     items = load_raw_items(args.raw)
+    skip = load_enriched(args.skip_from) if args.skip_from else {}
+    items = [i for i in items if "detail" not in skip.get(str(i["contentid"]), {})]
     done = failed = 0
     for item in items:
         cid = str(item["contentid"])

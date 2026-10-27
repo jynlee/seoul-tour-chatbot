@@ -1,4 +1,4 @@
-"""QA 통합: B8(place_info)·B9(멀티턴) — 실제 OpenSearch(seoul-tour-v2)·Ollama(gemma4:e4b)·MySQL(chat_message).
+"""QA 통합: B8(place_info)·B9(멀티턴) — 실제 OpenSearch(seoul-tour-v3)·Ollama(gemma4:e4b)·MySQL(chat_message).
 
 실행: pytest -m integration -v  (worktree 루트에 .env 필요)
 대화 기록은 `test-qa-` 접두 세션만 쓰고 끝나면 지운다.
@@ -10,6 +10,7 @@ import uuid
 import pytest
 
 from app.catalog import CAFE_CAT3
+from app.intent import matches_topic
 from app.llm import CLARIFY_ANSWER, ORDINAL_OUT_OF_RANGE
 from tests.conftest import FakeLLM
 
@@ -195,12 +196,17 @@ def test_live_qa5_qa6_out_of_range_and_no_target(live):
 
 @pytest.mark.parametrize("message", ["강서구에 산책할만한 곳 알려줘", "강서구 공원 추천해줘"])
 def test_live_gu_nature_topic(live, message):
-    """51b8c0d: 구 기준점은 구 전체에서, 산책·공원은 맞는 곳을 앞으로 → 1번이 강서습지생태공원."""
+    """51b8c0d: 구 기준점은 구 전체에서, 산책·공원은 맞는 곳을 앞으로.
+
+    데이터 확장(2026-10-27) 뒤 강서구 공원이 1곳 → 15곳 넘게 늘어 1번 고정 대신 '5곳 안에 강서습지생태공원,
+    5곳 모두 산책·자연 주제'로 확인한다.
+    """
     client, _, deps, sessions = live
     t = Talk(client, sessions)
     r = t.say(message)
     assert r["center"]["source"] == "gu" and r["center"]["label"] == "강서구"
-    assert r["places"][0]["title"] == "강서습지생태공원"
+    assert "강서습지생태공원" in [p["title"] for p in r["places"]], r["places"]
+    assert all(matches_topic(p["category"], p["title"], "nature") for p in r["places"]), r["places"]
     assert {deps.catalog[i].gu for i in ids(r)} == {"강서구"}
 
 
@@ -234,7 +240,8 @@ def test_live_qa8_area_carried_turn_keeps_history_and_distance(live):
 
 def test_live_topic_missing_and_hangang_food(live):
     client, _, _, sessions = live
-    r = Talk(client, sessions).say("금천구 산책할 곳")
+    # 데이터 확장 뒤 금천구에도 공원이 생겨 산책 대신 야경(금천구 0곳)으로 확인
+    r = Talk(client, sessions).say("금천구 야경 볼 곳")
     assert r["places"] and r["center"]["label"] == "금천구"
     assert any(w in r["answer"] for w in ("없", "못 찾", "어려", "아쉽")), r["answer"]  # 솔직히 안내
     r = Talk(client, sessions).say("한강 근처 맛집")
@@ -288,26 +295,28 @@ def tells_other_gu(answer, gus):
     return "다른 구" in answer or any(g in answer for g in gus)
 
 
-@pytest.mark.parametrize("turns", [["강서구 카페 추천해줘"], ["강서구 공원 추천해줘", "카페는?"]])
+# 데이터 확장(2026-10-27) 뒤 강서구에 카페가 9곳 생겨, 카페 0곳인 양천구로 확인
+@pytest.mark.parametrize("turns", [["양천구 카페 추천해줘"], ["양천구 공원 추천해줘", "카페는?"]])
 def test_live_qa9_gu_empty(live, turns):
     client, _, deps, sessions = live
     t = Talk(client, sessions)
     for m in turns:
         r = t.say(m)
-    assert r["center"]["source"] == "gu" and r["center"]["label"] == "강서구"
+    assert r["center"]["source"] == "gu" and r["center"]["label"] == "양천구"
     assert len(r["places"]) >= 3 and no_distance(r), r["places"]
     gus = {deps.catalog[i].gu for i in ids(r)}
-    assert "강서구" not in gus
+    assert "양천구" not in gus
     assert tells_other_gu(r["answer"], gus), r["answer"]
 
 
 def test_live_qa9_gu_fill_and_enough(live):
     client, _, deps, sessions = live
-    r = Talk(client, sessions).say("금천구 맛집 추천해줘")
+    # 데이터 확장 뒤 금천구 맛집이 3곳 넘게 늘어, 카페 1곳인 노원구로 '구 안 1곳 + 다른 구 채우기' 확인
+    r = Talk(client, sessions).say("노원구 카페 추천해줘")
     gus = [deps.catalog[i].gu for i in ids(r)]
     assert r["center"]["source"] == "gu" and no_distance(r)
-    assert gus[0] == "금천구" and len(gus) == 3, gus
-    assert tells_other_gu(r["answer"], set(gus) - {"금천구"}), r["answer"]
+    assert gus[0] == "노원구" and len(gus) == 3, gus
+    assert tells_other_gu(r["answer"], set(gus) - {"노원구"}), r["answer"]
     r = Talk(client, sessions).say("강남구 맛집 추천해줘")
     assert no_distance(r) and {deps.catalog[i].gu for i in ids(r)} == {"강남구"}
     assert "다른 구" not in r["answer"], r["answer"]

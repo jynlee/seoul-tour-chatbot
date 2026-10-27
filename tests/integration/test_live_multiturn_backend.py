@@ -87,13 +87,16 @@ def test_live_parenthesized_title_and_clarify(live):
 
 
 def test_live_qa9_gu_without_match(live):
-    """QA-9: 강서구엔 카페가 없음 → 다른 구 카페, 거리·도보 null, 답에서 다른 구라는 걸 알 수 있음."""
+    """QA-9: 양천구엔 카페가 없음 → 다른 구 카페, 거리·도보 null, 답에서 다른 구라는 걸 알 수 있음.
+
+    (데이터 확장 2026-10-27 전에는 강서구였으나 이제 강서구에 카페 9곳)
+    """
     client, deps, sessions = live
     sid = f"test-live-qa9-{uuid.uuid4().hex[:12]}"
     sessions.append(sid)
-    r = client.post("/api/chat", json={"session_id": sid, "message": "강서구 카페 추천해줘"}, timeout=120).json()
-    assert (r["center"]["source"], r["center"]["label"]) == ("gu", "강서구")
+    r = client.post("/api/chat", json={"session_id": sid, "message": "양천구 카페 추천해줘"}, timeout=120).json()
+    assert (r["center"]["source"], r["center"]["label"]) == ("gu", "양천구")
     assert r["places"] and all(p["distance_m"] is None and p["walk_min"] is None for p in r["places"])
     others = {deps.catalog[p["id"]].gu for p in r["places"]}
-    assert "강서구" not in others
+    assert "양천구" not in others
     assert "다른 구" in r["answer"] or any(g in r["answer"] for g in others), r["answer"]

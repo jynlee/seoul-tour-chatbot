@@ -34,6 +34,58 @@ CAT2_MAP = {
 }
 
 
+# 관광공사 신분류(lclsSystm1~3). 2026-10 서울 목록은 절반 넘게 cat1~3 이 비고 신분류만 있다.
+# cat3 가 없으면 신분류를 기존 코드로 바꿔서 분류명·카페 판별·OpenSearch cat3 필터가 그대로 동작하게 한다.
+# (cat3·신분류가 둘 다 있는 장소의 실제 대응을 보고 정함 — scripts/analyze_list.py, data/raw/lcls_codes.json)
+_KOREAN, _WESTERN, _JAPANESE, _CHINESE, _ETHNIC = "A05020100", "A05020200", "A05020300", "A05020400", "A05020700"
+LCLS_FOOD_CAT3 = {  # 긴 접두어부터 맞춤
+    "FD030100": CAFE_CAT3,  # 제과(베이커리 카페)
+    "FD030200": _WESTERN, "FD030300": _WESTERN,  # 피자·햄버거·샌드위치, 치킨
+    "FD03": _KOREAN,  # 김밥·분식 등 간이음식
+    "FD01": _KOREAN, "FD020100": _CHINESE, "FD020200": _JAPANESE, "FD020300": _WESTERN,
+    "FD020400": _ETHNIC, "FD020500": _ETHNIC, "FD05": CAFE_CAT3,
+}
+LCLS_CAT2 = {  # 긴 접두어부터 맞춤
+    "VE040300": "A0101",  # 둘레길 → 자연관광지 (산책)
+    "NA": "A0101",
+    "HS01": "A0201", "HS03": "A0201", "HS04": "A0201", "HS02": "A0205",
+    "VE01": "A0205",
+    "VE02": "A0202", "VE03": "A0202", "VE05": "A0202", "EX05": "A0202",
+    "VE04": "A0203", "EX01": "A0203", "EX02": "A0203", "EX04": "A0203", "EX07": "A0203",
+    "EX06": "A0204",
+    "VE06": "A0206", "VE07": "A0206", "VE09": "A0206", "VE12": "A0206",
+    "EV01": "A0207", "EV02": "A0208", "EV03": "A0208",
+    "LS01": "A0302", "AC05": "A0302", "VE10": "A0302", "LS02": "A0303", "LS03": "A0304", "LS04": "A0305",
+    "SH": "A0401",
+}
+_CULTURE_TYPE = "14"
+# 신분류 산업관광(EX06)에는 박물관이 섞여 있음('국립민속박물관'·'뮤지엄 김치간'이 기타산업관광지) → 문화시설로
+_MUSEUM_WORDS = ("박물관", "미술관", "기념관", "뮤지엄", "뉴지엄", "전시관", "과학관")
+
+
+def _by_prefix(table: dict[str, str], code: str) -> str:
+    for prefix in sorted(table, key=len, reverse=True):
+        if code.startswith(prefix):
+            return table[prefix]
+    return ""
+
+
+def effective_codes(item: dict) -> tuple[str, str]:
+    """(cat2, cat3). cat3 가 있으면 원래 값, 없으면 신분류에서 바꾼 값."""
+    cat2, cat3 = item.get("cat2", "") or "", item.get("cat3", "") or ""
+    if cat3:
+        return cat2, cat3
+    code = item.get("lclsSystm3", "") or item.get("lclsSystm2", "") or ""
+    if str(item.get("contenttypeid")) == FOOD_TYPE:
+        return "A0502", _by_prefix(LCLS_FOOD_CAT3, code)
+    if str(item.get("contenttypeid")) == _CULTURE_TYPE:
+        return "A0206", ""
+    cat2 = _by_prefix(LCLS_CAT2, code)
+    if cat2 == "A0204" and any(w in item.get("title", "") for w in _MUSEUM_WORDS):
+        return "A0206", ""
+    return cat2, ""
+
+
 @dataclass(frozen=True)
 class Place:
     id: str
@@ -51,14 +103,16 @@ class Place:
     # 관광공사 상세 정보 (scripts/enrich_detail.py): parking, hours, rest_day, menu, fee, reservation, pet, stroller,
     # contact, period, place, season, discount, age, packing 중 있는 것만
     detail: dict = field(default_factory=dict, compare=False, hash=False)
+    overview: str = field(default="", compare=False, hash=False)  # 관광공사 개요 (scripts/fetch_overview.py)
 
 
 def category_name(item: dict) -> str:
+    cat2, cat3 = effective_codes(item)
     if item.get("contenttypeid") == FOOD_TYPE:
-        name = FOOD_CAT3_MAP.get(item.get("cat3", ""))
+        name = FOOD_CAT3_MAP.get(cat3)
         if name:
             return name
-    return CAT2_MAP.get(item.get("cat2", ""), "기타")
+    return CAT2_MAP.get(cat2, "기타")
 
 
 def kind_of(content_type: str) -> str:
@@ -92,7 +146,7 @@ def _float(v) -> float:
         return 0.0
 
 
-def place_from_item(item: dict, tel: str = "", detail: dict | None = None) -> Place:
+def place_from_item(item: dict, tel: str = "", detail: dict | None = None, overview: str = "") -> Place:
     addr = f"{item.get('addr1', '')} {item.get('addr2', '')}".strip()
     content_type = str(item.get("contenttypeid", ""))
     return Place(
@@ -101,7 +155,7 @@ def place_from_item(item: dict, tel: str = "", detail: dict | None = None) -> Pl
         content_type=content_type,
         kind=kind_of(content_type),
         category=category_name(item),
-        cat3=item.get("cat3", ""),
+        cat3=effective_codes(item)[1],
         addr=addr,
         tel=tel or item.get("tel", "") or "",
         lat=_float(item.get("mapy")),
@@ -109,6 +163,7 @@ def place_from_item(item: dict, tel: str = "", detail: dict | None = None) -> Pl
         image=item.get("firstimage", "") or "",
         gu=_gu_of(item.get("addr1", "")),
         detail=dict(detail or {}),
+        overview=overview or "",
     )
 
 
@@ -130,6 +185,7 @@ def load_catalog(raw_path="data/seoul_tour.json", enriched_path="data/seoul_tour
     catalog: dict[str, Place] = {}
     for item in load_raw_items(raw_path):
         extra = enriched.get(str(item["contentid"]), {})
-        place = place_from_item(item, tel=extra.get("tel", ""), detail=extra.get("detail"))
+        place = place_from_item(item, tel=extra.get("tel", ""), detail=extra.get("detail"),
+                                overview=extra.get("overview", ""))
         catalog[place.id] = place
     return catalog

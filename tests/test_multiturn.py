@@ -9,13 +9,14 @@ from app.history import InMemoryHistoryRepo
 from app.llm import CLARIFY_ANSWER, ORDINAL_OUT_OF_RANGE, info_template_answer
 from app.schemas import ChatRequest
 from tests.conftest import FakeEmbedder, FakeLLM, FakeSearcher
+from tests.conftest import CATALOG_574
 
 CAFE = "A05020900"
 
 
 @pytest.fixture(scope="module")
 def real_catalog(tmp_path_factory):
-    catalog = load_catalog("data/seoul_tour.json", tmp_path_factory.mktemp("e") / "none.json")
+    catalog = load_catalog(CATALOG_574, tmp_path_factory.mktemp("e") / "none.json")
     by_title = {p.title: p for p in catalog.values()}
     # B8용 상세 정보: 고려삼계탕은 주차 정보만 없음, 개성만두 궁은 주차 '불가능'
     gs = by_title["고려삼계탕"]
@@ -354,3 +355,73 @@ def test_gu_with_enough_places_has_no_notice(real_catalog):
     _assert_gu_no_distance(r, "강남구")
     assert all(real_catalog[p.id].gu == "강남구" for p in r.places)
     assert r.answer == "가짜 답변이에요."
+
+
+def test_demonstrative_near_after_earlier_list_with_generic_title(real_catalog):
+    # 사용자 버그(2026-10-27): 앞선 목록에 제목에 '카페'가 든 곳(도자기카페 줄)이 있으면 "그 근처 카페는?"이
+    # 직전 첫 추천이 아니라 그곳을 기준점으로 잡던 문제
+    s = Session(real_catalog)
+    r1 = s.say("마포구 쇼핑 추천해줘")
+    assert "도자기카페 줄" in _titles(r1)  # 전제: 앞선 목록에 제목에 '카페'가 든 곳
+    r2 = s.say("강서구 공원 추천해줘")
+    first = r2.places[0]
+    r3 = s.say("그 근처 카페는?")
+    assert r3.center.label == first.title and r3.center.source == "place", (r3.center, first.title)
+    assert r3.places and all(real_catalog[p.id].cat3 == CAFE for p in r3.places)
+
+
+# ---- 사용자 결정(2026-10-27): '서울에서…'·주제만 묻는 새 질문은 직전 기준점을 이어받지 않고 서울 전체에서 ----
+
+@pytest.mark.parametrize("q", ["서울에서 데이트 코스 추천해줘", "야경 보기 좋은곳 알려줘", "산책하기 좋은 곳 알려줘",
+                               "서울 전체에서 역사 관광지 알려줘"])
+def test_fresh_question_does_not_inherit_center(real_catalog, q):
+    s = Session(real_catalog)
+    assert s.say("명동 맛집 추천해줘").center.label == "명동"
+    r = s.say(q)
+    assert r.center is None, (q, r.center)
+    assert r.places
+
+
+@pytest.mark.parametrize("q", ["카페는?", "공원은?", "다른 데 더 추천해줘", "거기 근처 관광지"])
+def test_follow_up_keeps_center(real_catalog, q):
+    s = Session(real_catalog)
+    r1 = s.say("명동 맛집 추천해줘")
+    assert r1.center.label == "명동"
+    r = s.say(q)
+    expected = r1.places[0].title if q.startswith("거기") else "명동"  # '거기 근처'는 직전 첫 추천
+    assert r.center is not None and r.center.label == expected, (q, r.center)
+
+
+def test_seoul_station_is_still_an_area(real_catalog):
+    s = Session(real_catalog)
+    s.say("명동 맛집 추천해줘")
+    assert s.say("서울역 근처 맛집").center.label == "서울역"
+
+
+def test_wants_whole_seoul():
+    from app.dialog import wants_whole_seoul
+
+    assert wants_whole_seoul("서울에서 데이트 코스 추천해줘")
+    assert wants_whole_seoul("서울 야경 명소")
+    assert wants_whole_seoul("야경 보기 좋은곳 알려줘")
+    assert not wants_whole_seoul("서울역 근처 맛집")
+    assert not wants_whole_seoul("서울숲 근처 카페")
+    assert not wants_whole_seoul("카페는?")
+    assert not wants_whole_seoul("공원은?")
+    assert not wants_whole_seoul("다른 데 더 추천해줘")
+    assert not wants_whole_seoul("거기 근처 산책할 곳")
+    # QA-11: 근처·주변·이 동네·여기 같은 말이 있으면 직전 기준점 이어받기
+    for m in ("이 근처 박물관도 있어?", "근처에 산책할 곳 있어?", "주변에 야경 명소는?", "이 동네 역사 유적지",
+              "여기 산책할 곳 있어?", "이곳 야경 명소는?"):
+        assert not wants_whole_seoul(m), m
+    # 리드 결정: '그럼/그러면/그리고/또' + 짧은 '○○은?' 이어 묻기도 이어받기
+    for m in ("그럼 산책할 곳은?", "그러면 야경 명소는?", "그리고 박물관은?", "또 역사 유적지는?", "또 공원 있어?",
+              "그럼 야경 볼 곳 추천해줘"):
+        assert not wants_whole_seoul(m), m
+    # '서울'을 낱말로 말하면 근처가 있어도 서울 전체, 연결어 없는 새 주제 질문도 서울 전체
+    assert wants_whole_seoul("역사 유적지 알려줘")
+    assert wants_whole_seoul("그럼 서울 야경 명소는?")
+    # QA-12: 다른 곳을 직접 말한 '○○ 근처'는 이어 묻기가 아님 (그곳이 기준점으로 안 잡혀도 직전 구를 이어받지 않음)
+    assert wants_whole_seoul("한강 근처 야경 볼 곳")
+    assert wants_whole_seoul("롯데월드타워 근처 야경 명소")
+    assert not wants_whole_seoul("박물관도 이 근처에 있어?")

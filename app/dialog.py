@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE, Place
 from app.center import match_place, matched_alias
-from app.intent import ALL_TYPES, TOUR_TYPES, Intent, has_word
+from app.intent import ALL_TYPES, TOUR_TYPES, Intent, detect_intent, has_word
 from app.schemas import HistoryMessage, PlaceOut
 
 # ---- 정보 질문 ----
@@ -56,6 +56,9 @@ _CATEGORY_WORDS = {
     "궁": "역사관광지", "쇼핑": "쇼핑", "시장": "쇼핑", "축제": "축제", "공연": "공연/행사",
 }
 _KIND_WORDS = {"식당": "food", "맛집": "food", "음식점": "food", "밥집": "food", "관광지": "tour", "명소": "tour"}
+# 분류 일반어('카페'·'식당'·'공원'…)만 겹친 제목은 이름 일부 일치로 치지 않는다 ('…(아트샵&카페)'가 "카페는?"에 걸리던 문제).
+# "아까 그 카페"는 위 분류 일치 규칙으로 따로 찾는다.
+_GENERIC_WORDS = tuple(w for w in (*_CATEGORY_WORDS, *_KIND_WORDS) if len(w) >= 2)
 
 
 def _has(message: str, words) -> bool:
@@ -104,7 +107,7 @@ def _longest_title_substring(title: str, message: str) -> int:
             sub = compact[i:j]
             if j - i <= best:
                 break
-            if sub in message and not any(sub in s for s in _STOP_SUBSTRINGS):
+            if sub in message and not any(sub in s for s in _STOP_SUBSTRINGS + _GENERIC_WORDS):
                 best = j - i
                 break
     return best
@@ -153,8 +156,11 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
     if named is not None:
         return Reference(named, "title")
 
-    # 3) "아까 그 카페", "그 삼계탕집"
-    if _has(message, REF_MARKERS):
+    # 3) "아까 그 카페", "그 삼계탕집" — "그 근처/그 주변/그 집"의 '그 '는 지칭 표시로 보지 않음(4단계 지시어 우선)
+    marked = message
+    for d in REF_DEMONSTRATIVES:
+        marked = marked.replace(d, " ")
+    if _has(marked, REF_MARKERS):
         for places in ([last_places] if last_places else []) + list(earlier_lists):
             ref = from_out(_partial_match(message, places, use_category=not near), "partial")
             if ref is not None:
@@ -171,6 +177,29 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
         if last_places:
             return from_out(last_places[0], "demonstrative")
     return None
+
+
+# "서울에서·서울 전체·서울 야경" (서울역·서울숲 같은 이름은 아님)
+_WHOLE_SEOUL = re.compile(r"서울(?=$|[\s?!.,]|에서|에|의|은|는|을|이|가|도|전체|시내|안|곳곳)")
+# "카페는?"·"공원은?"처럼 말 하나에 '은/는'만 붙인 이어 묻기
+_SHORT_FOLLOW_UP = re.compile(r"^\s*[가-힣A-Za-z]{1,8}\s*(?:은|는)\s*[?？]?\s*$")
+# "그럼 산책할 곳은?"·"또 공원 있어?" — 연결어 + 짧은 이어 묻기 (리드 결정 QA-11)
+_CONNECTIVE_FOLLOW_UP = re.compile(r"^\s*(?:그럼|그러면|그리고|또)\s+\S.{0,14}$")
+# "이 근처 박물관도 있어?"·"주변에 야경 명소는?"·"이 동네 맛집" — 지금 보고 있는 곳 근처라는 말 (QA-11).
+# '근처/주변'은 질문 맨 앞일 때만 — "한강 근처 야경"처럼 다른 곳을 직접 말한 건 새 질문 (QA-12)
+_NEAR_HERE = re.compile(r"^\s*(?:근처|주변|인근|가까운)|이\s*(?:근처|주변|근방|동네)|이동네|여기|이곳")
+
+
+def wants_whole_seoul(message: str) -> bool:
+    """직전 기준점을 이어받지 않고 서울 전체에서 찾을 새 질문: '서울'을 낱말로 말했거나, 연결어 없이 세부 주제
+    (야경·산책·역사…)만 물은 새 추천 질문 (사용자 결정 2026-10-27).
+    "카페는?"·"그럼 산책할 곳은?"·"다른 데 더"·"거기/이 근처…"·"주변에 ○○" 같은 이어 묻기는 아님 (QA-11)."""
+    if _WHOLE_SEOUL.search(message):
+        return True
+    if (is_more_request(message) or has_demonstrative(message) or _SHORT_FOLLOW_UP.match(message)
+            or _CONNECTIVE_FOLLOW_UP.match(message) or _NEAR_HERE.search(message)):
+        return False
+    return detect_intent(message).topic is not None  # 맛집·카페 질문은 주제 없음
 
 
 def ordinal_out_of_range(message: str, last_places: list[PlaceOut]) -> bool:

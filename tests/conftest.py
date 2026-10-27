@@ -3,6 +3,10 @@ import pytest
 
 from app.catalog import Place
 
+# 2026-10-27 데이터 확장(574 → 3,444곳) 전 데이터. 특정 장소·"강서구에 카페 없음"(QA-9) 같은 대화 시나리오를 고정한
+# 테스트는 이 파일로 돈다(로직 검증용). 새 데이터 자체는 tests/test_catalog.py 의 test_new_data_* 와 통합 테스트가 본다.
+CATALOG_574 = "tests/fixtures/seoul_tour_574.json"
+
 
 def _p(id, title, ct, category, cat3, addr, lat, lng, gu, tel="", image=""):
     kind = "food" if ct == "39" else ("event" if ct == "15" else "tour")
@@ -37,7 +41,7 @@ class FakeEmbedder:
 
 
 class FakeSearcher:
-    """카탈로그에서 type/cat3 조건에 맞는 장소를 카탈로그 순서대로(점수 내림차순) 돌려준다.
+    """카탈로그에서 type/cat3(·near 반경) 조건에 맞는 장소를 카탈로그 순서대로(점수 내림차순) 돌려준다.
 
     scores: {place_id: score}를 주면 그 점수로 정렬. fail=True면 SearchUnavailable.
     """
@@ -48,10 +52,11 @@ class FakeSearcher:
         self.fail = fail
         self.calls = []
 
-    def knn(self, vector, content_types, cat3, k):
+    def knn(self, vector, content_types, cat3, k, near=None):
+        from app.geo import haversine_m
         from app.search import SearchUnavailable
 
-        self.calls.append({"content_types": set(content_types), "cat3": cat3, "k": k})
+        self.calls.append({"content_types": set(content_types), "cat3": cat3, "k": k, "near": near})
         if self.fail:
             raise SearchUnavailable("가짜 검색 서버 꺼짐")
         hits = []
@@ -60,6 +65,8 @@ class FakeSearcher:
             if p.content_type not in content_types:
                 continue
             if cat3 and p.cat3 != cat3:
+                continue
+            if near is not None and not (p.lat and p.lng and haversine_m(near[0], near[1], p.lat, p.lng) <= near[2]):
                 continue
             hits.append((p.id, self.scores.get(p.id, 1.0 - i / (n + 1))))
         hits.sort(key=lambda h: -h[1])

@@ -16,7 +16,7 @@ from typing import Any
 from app.center import Center, has_named_area, resolve_center
 from app.dialog import (
     asked_fields, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
-    intent_from_places, is_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference,
+    intent_from_places, is_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference, wants_whole_seoul,
 )
 from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE
 from app.intent import CASUAL_RESPONSES, TOUR_TOPICS, TOUR_TYPES, detect_intent
@@ -108,8 +108,9 @@ class ChatService:
             p = ref.place
             center = Center(lat=p.lat, lng=p.lng, label=p.title, source="place", place_id=p.id)
         else:
-            center = resolve_center(msg, req.location, req.selected_place_id, last_places,
-                                    last.center if last else None, catalog)
+            # '서울에서…'·주제만 묻는 새 질문은 직전 기준점을 이어받지 않음 (지역·장소 이름이 있으면 그것대로)
+            last_center = last.center if last and not wants_whole_seoul(msg) else None
+            center = resolve_center(msg, req.location, req.selected_place_id, last_places, last_center, catalog)
         label = center.label if center else None
         exclude = self._shown_ids(messages, label) if more else set()
 

@@ -1,8 +1,8 @@
-"""seoul-tour-v2 인덱스를 (다시) 만든다.
+"""seoul-tour-v3 인덱스를 (다시) 만든다.
 
     python scripts/build_index.py
 
-settings.opensearch_index 인덱스만 지우고 재생성한다. 기존 seoul-tour 인덱스는 이름이 같으면 거부한다.
+settings.opensearch_index 인덱스만 지우고 재생성한다. seoul-tour·seoul-tour-v2·food-materials 는 이름이 같으면 거부한다.
 좌표가 없는 장소도 색인은 한다(location 필드만 뺌).
 """
 import sys
@@ -25,7 +25,7 @@ def main() -> int:
     except ConfigError as e:
         print(e)
         return 1
-    index = index_name_guard(settings.opensearch_index)
+    index = index_name_guard(settings.opensearch_index, write=True)
 
     catalog = load_catalog(ROOT / "data" / "seoul_tour.json", ROOT / "data" / "seoul_tour_enriched.json")
     print(f"카탈로그 {len(catalog)}건, 임베딩 모델 로딩: {settings.embed_model}")

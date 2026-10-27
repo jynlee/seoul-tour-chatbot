@@ -22,7 +22,7 @@ def test_missing_required_lists_all_names():
 
 def test_defaults():
     s = load_settings(REQUIRED)
-    assert s.opensearch_index == "seoul-tour-v2"
+    assert s.opensearch_index == "seoul-tour-v3"
     assert s.ollama_model == "gemma4:e4b"
     assert s.mysql_db == "seoul_tour"
     assert s.opensearch_port == 9200

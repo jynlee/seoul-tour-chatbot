@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 
 from app.catalog import Place, has_coords
-from app.geo import AREAS, SEOUL_GU
+from app.geo import AREAS, SEOUL_GU, haversine_m
 from app.schemas import CenterOut, Location, PlaceOut
 
 DEMONSTRATIVES = ("거기 근처", "그 근처", "그 주변", "거기", "그곳", "저기")
@@ -27,6 +27,8 @@ _TRIM = re.compile(r"[\s?!.~,]+")
 # 괄호 안 말 중 이름이 아닌 것: 지역 표시('서울')·설명('실내'·'일본군 위안부')·지점('강남코엑스점')·옛 이름 설명('구 ○○')·한 글자
 _PAREN = re.compile(r"\s*\(([^)]*)\)\s*")
 _NOT_NAMES = {"서울", "실내", "실외", "일본군 위안부"}
+_BRACKET = re.compile(r"\[[^\]]*\]")
+_AND_HEAD = re.compile(r"^([^\s\[\]]+?)\s?(?:과|와)\s")
 
 
 @dataclass
@@ -35,7 +37,7 @@ class Center:
     lng: float
     label: str
     source: str  # gps | place | area | gu | history
-    place_id: str | None = None  # source=place 일 때 그 장소 id (추천 결과에서 자기 자신은 뺌)
+    place_id: str | None = None  # 기준점이 장소일 때(이어받은 history 포함) 그 장소 id (추천 결과에서 자기 자신은 뺌)
 
     def to_out(self) -> CenterOut:
         return CenterOut(lat=self.lat, lng=self.lng, label=self.label, source=self.source)
@@ -49,6 +51,9 @@ def _gu_aliases() -> list[tuple[str, str]]:
 
 
 GU_ALIASES = _gu_aliases()
+
+# 지역 이름과 같은 제목의 장소('한강'·'명동'·'홍대'·'강남')는 사람들이 거의 늘 지역을 뜻해서 말한다 → 이름 찾기에서 뺀다.
+AREA_LIKE_TITLES = frozenset(AREAS) | {alias for alias, _gu in GU_ALIASES} | {"한강", "서울"}
 
 
 def dong_names(addr: str) -> set[str]:
@@ -96,9 +101,14 @@ def _match_gu_alias(message: str) -> str | None:
 
 
 def title_aliases(title: str) -> list[str]:
-    """장소를 부르는 이름 후보: 원래 제목 + 괄호 뺀 이름 + (이름다운) 괄호 안 이름."""
+    """장소를 부르는 이름 후보: 원래 제목 + 괄호 뺀 이름 + (이름다운) 괄호 안 이름 + 문화재식 제목에서 뗀 이름."""
+    names = _paren_aliases(title)
+    return names + [n for n in _heritage_aliases(title) if n not in names]
+
+
+def _paren_aliases(title: str) -> list[str]:
     names = [title]
-    base = " ".join(_PAREN.sub(" ", title).split())
+    base = _without_parens(title)
     if base != title and len(base.replace(" ", "")) >= 2:
         names.append(base)
     for inner in _PAREN.findall(title):
@@ -108,6 +118,24 @@ def title_aliases(title: str) -> list[str]:
             continue
         names.append(inner)
     return names
+
+
+def _heritage_aliases(title: str) -> list[str]:
+    """문화재식 제목('서울 운현궁'·'창덕궁과 후원 [유네스코 세계유산]'·'[서울둘레길 3코스] 불암산코스'):
+    대괄호 설명을 뗀 이름 → 앞의 '서울 '을 뗀 이름 → 첫 낱말이 '○○과/와'면 그 앞 이름 (QA-10) → '○○&○○'의 앞 이름 (QA-10b)."""
+    plain = " ".join(_BRACKET.sub(" ", _without_parens(title)).split())
+    no_seoul = plain[len("서울 "):] if plain.startswith("서울 ") else plain
+    head = _AND_HEAD.match(no_seoul)
+    amp = no_seoul.split("&")[0].strip() if "&" in no_seoul else ""  # '롯데월드타워&롯데월드몰' (QA-10b)
+    names: list[str] = []
+    for name in (plain, no_seoul, head.group(1) if head else "", amp if len(amp.replace(" ", "")) >= 3 else ""):
+        if len(name.replace(" ", "")) >= 2 and name != title and name not in names:
+            names.append(name)
+    return names
+
+
+def _without_parens(title: str) -> str:
+    return " ".join(_PAREN.sub(" ", title).split())
 
 
 def _alias_used(alias: str, text: str) -> bool:
@@ -139,7 +167,7 @@ def _short_title_used_as_place(title: str, text: str) -> bool:
 
 
 def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
-    """장소 이름(괄호 뺀 이름·괄호 안 이름 포함)이 질문에 있으면: 정확히 같은 이름 > 가장 긴 이름 > 가장 짧은 id."""
+    """장소 이름(괄호 뺀 이름·괄호 안 이름 포함)이 질문에 있으면: 정확히 같은 이름 > 가장 긴 이름 > 제목·괄호 별칭 > 덧붙은 말이 적은 제목 > 가장 짧은 id."""
     text = message.strip()
     # 지역·구 이름과 같거나 그 안에 들어 있는 이름(예: '강남'=강남구, '강남역' 속 '강남')은 장소로 보지 않는다.
     # → 구/지역 이름이 같은 이름의 장소보다 우선.
@@ -152,14 +180,19 @@ def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
         if not p.title or not has_coords(p):
             continue
         hits = [a for a in title_aliases(p.title)
-                if _alias_used(a, text) and not any(a in n for n in bigger_names)]
+                if a not in AREA_LIKE_TITLES and _alias_used(a, text) and not any(a in n for n in bigger_names)]
         if not hits:
             continue
         exact = any(a.lower() == text.lower() for a in hits)
-        candidates.append((not exact, -max(len(a) for a in hits), len(p.id), p.id, p))
+        best = max(hits, key=len)
+        # 같은 이름이면 제목·괄호 별칭인 장소 먼저, 문화재식 제목에서 뗀 이름끼리는 덧붙은 말('서울 '·'[K드라마 촬영지]')이
+        # 적은 제목 = 대표 장소(본체) 먼저
+        derived = best not in _paren_aliases(p.title)
+        candidates.append((not exact, -len(best), derived, len(p.title) - len(best) if derived else 0,
+                           len(p.id), p.id, p))
     if not candidates:
         return None
-    return min(candidates, key=lambda c: c[:4])[4]
+    return min(candidates, key=lambda c: c[:6])[6]
 
 
 def _match_dong(message: str, catalog: dict[str, Place]) -> tuple[str, list[Place]] | None:
@@ -228,7 +261,10 @@ def resolve_center(
     if last_center is not None:
         # 구 기준점을 이어받으면 source 도 "gu" 그대로 (구 전체에서 고르고 거리는 null — 프론트 요약 바와 일치)
         source = "gu" if last_center.source == "gu" or last_center.label in SEOUL_GU else "history"
-        return Center(lat=last_center.lat, lng=last_center.lng, label=last_center.label, source=source)
+        # 장소 기준점을 이어받으면 그 장소 id도 (추천에서 자기 자신·세부 장소를 빼게)
+        same = next((p.id for p in catalog.values() if p.title == last_center.label and has_coords(p)
+                     and haversine_m(p.lat, p.lng, last_center.lat, last_center.lng) <= 10), None)
+        return Center(lat=last_center.lat, lng=last_center.lng, label=last_center.label, source=source, place_id=same)
 
     # ⑧ 없음
     return None
