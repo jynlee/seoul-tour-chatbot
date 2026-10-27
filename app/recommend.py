@@ -1,5 +1,5 @@
 """후보 검색 결과 → 최종 추천 장소. 장소 목록은 항상 카탈로그에서 만든다."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.catalog import Place, has_coords
 from app.center import Center
@@ -17,6 +17,8 @@ class Recommendation:
     fallback_note: str | None = None
     topic_missing: bool = False  # 세부 주제(산책 등)를 물었는데 맞는 곳이 하나도 없음 → 답변에서 솔직히 말함
     gu_wide: bool = False  # 구 기준점: 반경이 아니라 구 전체에서 골랐음 (거리·도보 null)
+    gu_empty: bool = False  # 구 기준점인데 구 안에 맞는 곳이 0곳 → 가까운 다른 구에서 골랐음 (답변에서 솔직히)
+    place_gus: dict[str, str] = field(default_factory=dict)  # 구 기준점 결과의 장소 id → 구 (다른 구인지 답에서 밝히게)
 
 
 def to_place_out(p: Place, distance_m: float | None = None) -> PlaceOut:
@@ -97,15 +99,15 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
         in_gu = [p for p in candidates if in_this_gu(p)]
         in_gu += [p for p in catalog.values() if in_this_gu(p) and p.id not in seen and ok(p)]
         in_gu.sort(key=lambda p: -boost(p))
-        chosen = [(p, dist(p)) for p in in_gu[:k]]
-        if chosen:
-            if len(chosen) < MIN_PLACES:
-                ids = {p.id for p, _ in chosen}
-                extra = sorted(((p, dist(p)) for p in catalog.values() if p.id not in ids and ok(p)),
-                               key=lambda x: x[1])
-                chosen += extra[: MIN_PLACES - len(chosen)]
-            # 구 중심(평균 좌표)에서 잰 거리는 사용자에게 의미가 없어 distance_m·walk_min 은 null (QA-8)
-            return Recommendation(places=[to_place_out(p) for p, _ in chosen], gu_wide=True)
+        chosen = in_gu[:k]
+        if len(chosen) < MIN_PLACES:
+            # 구 안이 0~2곳이면 같은 조건의 가장 가까운 다른 구 장소로 3곳까지 채운다
+            ids = {p.id for p in chosen}
+            extra = sorted((p for p in catalog.values() if p.id not in ids and ok(p)), key=dist)
+            chosen += extra[: MIN_PLACES - len(chosen)]
+        # 구 중심(평균 좌표)에서 잰 거리는 사용자에게 의미가 없어 distance_m·walk_min 은 null (QA-8, QA-9: 구 밖으로 채워도)
+        return Recommendation(places=[to_place_out(p) for p in chosen], gu_wide=True, gu_empty=not in_gu,
+                              place_gus={p.id: p.gu for p in chosen})
 
     within = [(p, dist(p)) for p in candidates if dist(p) <= radius_m][:k]
     if within:

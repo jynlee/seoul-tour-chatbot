@@ -296,3 +296,61 @@ def test_name_only_after_clarify_explain(real_catalog):
     r3 = s.say("석파정")
     assert r3.places == [] and r3.center is None  # 추천이 아니라 장소 설명
     assert sp.title in s.deps.llm.prompts[calls]
+
+
+# ---------------- QA-9: 구 안에 맞는 곳이 0곳·1~2곳일 때 ----------------
+
+def _assert_gu_no_distance(r, gu):
+    assert (r.center.source, r.center.label) == ("gu", gu)
+    assert r.places
+    assert all(p.distance_m is None and p.walk_min is None for p in r.places)
+
+
+@pytest.mark.parametrize("turns", [["강서구 카페 추천해줘"], ["강서구 공원 추천해줘", "카페는?"]])
+def test_qa9_gu_without_match_shows_other_gu_honestly(real_catalog, turns):
+    # 카탈로그 카페 14곳 중 강서구는 0곳 → 가까운 다른 구 카페, 거리 null, 첫머리에 솔직히
+    s = Session(real_catalog, llm=FakeLLM(fail=True))
+    for t in turns:
+        r = s.say(t)
+    _assert_gu_no_distance(r, "강서구")
+    assert all(real_catalog[p.id].cat3 == CAFE and real_catalog[p.id].gu != "강서구" for p in r.places)
+    assert r.answer.startswith("강서구 안에는 카페 정보가 없어서, 가까운 다른 구의 카페를 보여 드려요.")
+    assert "근처" not in r.answer and "km" not in r.answer
+
+
+def test_qa9_prompt_has_each_place_gu_and_notice_added(real_catalog):
+    s = Session(real_catalog)  # FakeLLM 답에는 안내가 없음 → 앞에 붙임
+    r = s.say("강서구 카페 추천해줘")
+    prompt = s.deps.llm.prompts[-1]
+    for p in r.places:
+        assert f"구: {real_catalog[p.id].gu}" in prompt
+    assert "'강서구' 안에는 맞는 카페 정보가 없어서" in prompt  # LLM에게 솔직히 말하라는 규칙
+    assert r.answer == "강서구 안에는 카페 정보가 없어서, 가까운 다른 구의 카페를 보여 드려요. 가짜 답변이에요."
+
+
+def test_qa9_notice_not_duplicated_when_llm_says_it(real_catalog):
+    said = "강서구에는 카페가 없어서 다른 구인 용산구 카페를 골랐어요."
+    r = Session(real_catalog, llm=FakeLLM(said)).say("강서구 카페 추천해줘")
+    assert r.answer == said
+
+
+def test_qa9_partial_fill_names_other_gu(real_catalog):
+    # 금천구 음식점은 1곳 → 다른 구 2곳으로 채움. 거리 null, 채운 곳이 다른 구라는 걸 답에서 알 수 있게
+    s = Session(real_catalog)
+    r = s.say("금천구 맛집 추천해줘")
+    _assert_gu_no_distance(r, "금천구")
+    gus = [real_catalog[p.id].gu for p in r.places]
+    assert gus[0] == "금천구" and len(r.places) == 3 and all(g != "금천구" for g in gus[1:])
+    others = "·".join(dict.fromkeys(gus[1:]))
+    assert r.answer.startswith(f"금천구 안에는 1곳뿐이라 가까운 다른 구({others})의 곳도 함께 골랐어요.")
+    assert "구: 금천구" in s.deps.llm.prompts[-1]
+
+    r2 = Session(real_catalog, llm=FakeLLM(f"금천구 맛집과 함께 {gus[1]}의 맛집도 골랐어요.")).say("금천구 맛집 추천해줘")
+    assert r2.answer == f"금천구 맛집과 함께 {gus[1]}의 맛집도 골랐어요."  # 다른 구 이름을 말했으면 안 붙임
+
+
+def test_gu_with_enough_places_has_no_notice(real_catalog):
+    r = Session(real_catalog).say("강남구 맛집 추천해줘")
+    _assert_gu_no_distance(r, "강남구")
+    assert all(real_catalog[p.id].gu == "강남구" for p in r.places)
+    assert r.answer == "가짜 답변이에요."

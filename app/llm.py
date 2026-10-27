@@ -17,8 +17,10 @@ class LLM(Protocol):
 NEAR_RADIUS_M = 1500
 
 
-def _place_line(i: int, p: PlaceOut, mark_far: bool = True) -> str:
+def _place_line(i: int, p: PlaceOut, mark_far: bool = True, gu: str | None = None, center_gu: str | None = None) -> str:
     line = f"{i}. 이름: {p.title} / 분류: {p.category} / 주소: {p.addr}"
+    if gu:
+        line += f" / 구: {gu}" + (f" ({center_gu} 밖의 다른 구)" if center_gu and gu != center_gu else "")
     if mark_far and p.walk_min is not None:
         line += f" / 도보 {p.walk_min}분"
     if mark_far and p.distance_m is not None and p.distance_m > NEAR_RADIUS_M:
@@ -39,13 +41,24 @@ def mentions_far(answer: str) -> bool:
     return any(w in answer for w in ("떨어", "멀", "km"))
 
 
+def mentions_other_gu(answer: str, other_gus) -> bool:
+    return "다른 구" in answer or any(g in answer for g in other_gus)
+
+
 def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
                  center_label: str | None, fallback_note: str | None, more: bool = False,
                  far_notice: str | None = None, topic_label: str | None = None, topic_missing: bool = False,
-                 gu_wide: bool = False) -> str:
-    """gu_wide: 구 전체에서 고른 결과 → 구 중심에서의 거리·'조금 멂' 표시는 의미가 없어 뺀다."""
+                 gu_wide: bool = False, place_gus: dict[str, str] | None = None, gu_empty: bool = False,
+                 what: str = "장소") -> str:
+    """gu_wide: 구 전체에서 고른 결과 → 구 중심에서의 거리·'조금 멂' 표시는 의미가 없어 뺀다.
+
+    place_gus: 장소 id → 구 (구 결과에 다른 구 장소가 섞였는지 말하게). gu_empty: 구 안에 맞는 곳이 0곳.
+    """
+    place_gus = place_gus or {}
     history = "\n".join(history_texts[-HISTORY_LIMIT:]) or "(없음)"
-    place_text = "\n".join(_place_line(i, p, mark_far=not gu_wide) for i, p in enumerate(places, 1)) or "(없음)"
+    place_text = "\n".join(_place_line(i, p, mark_far=not gu_wide, gu=place_gus.get(p.id), center_gu=center_label)
+                           for i, p in enumerate(places, 1)) or "(없음)"
+    outside = {place_gus[p.id] for p in places if p.id in place_gus and place_gus[p.id] != center_label}
     rules = [
         "반드시 한국어로, 2문장 이내로만 답변할 것",
         "아래 [추천 장소]에 있는 장소만 언급하고, 목록에 없는 장소를 지어내지 말 것",
@@ -61,7 +74,14 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
     else:
         rules.append("기준점이 없으므로 '근처'·'주변'이라는 말이나 특정 동네·지역 이름을 쓰지 말 것")
         rules.append("답변 끝에 현재 위치(📍)를 켜거나 지역 이름을 말해 주면 더 가까운 곳을 찾아 준다고 안내할 것")
-    if gu_wide:
+    if gu_wide and gu_empty:
+        rules.append(f"'{center_label}' 안에는 맞는 {what} 정보가 없어서 가까운 다른 구에서 골랐다. 첫 문장에서 이 점을 솔직히 "
+                     "말하고, 장소마다 [추천 장소]의 '구'로 어느 구에 있는지 말할 것. '근처'라는 말과 거리 얘기는 하지 말 것")
+    elif gu_wide and outside:
+        rules.append(f"[추천 장소] 중 '구'가 {center_label}인 곳은 '{center_label}에 있는'처럼 말하고, 다른 구"
+                     f"({'·'.join(sorted(outside))})에 있는 곳은 {center_label}에 맞는 곳이 적어 함께 고른 다른 구 장소라고 "
+                     "구 이름을 밝혀 말할 것. 거리 얘기는 하지 말 것")
+    elif gu_wide:
         rules.append(f"[추천 장소]는 {center_label} 안에서 고른 곳이니 '{center_label}에 있는'처럼 말하고 거리 얘기는 하지 말 것")
     if topic_label and topic_missing:
         rules.append(f"[추천 장소]에는 '{topic_label}'에 딱 맞는 곳이 없다. 첫 문장에서 이 점을 솔직히 말하고, "
@@ -101,6 +121,10 @@ CLARIFY_ANSWER = "어느 곳을 말씀하시는지 알려주세요. 장소 이�
 NO_MORE_ANSWER = "{label} 조건으로 더 보여드릴 곳이 없어요. 다른 지역이나 종류로 물어봐 주세요."
 ORDINAL_OUT_OF_RANGE = "목록에는 {n}곳까지 있어요. 몇 번째 장소인지 다시 알려 주세요."
 TOPIC_MISSING_NOTICE = "{where}{topic}에 딱 맞는 곳은 못 찾아서 비슷한 관광지를 골랐어요."
+GU_EMPTY_NOTICE = "{gu} 안에는 {what} 정보가 없어서, 가까운 다른 구의 {what_obj} 보여 드려요."
+GU_EMPTY_MORE_NOTICE = "{gu} 안에서는 더 보여드릴 {what} 정보가 없어서, 가까운 다른 구의 {what_obj} 보여 드려요."
+GU_FILL_NOTICE = "{gu} 안에는 {n}곳뿐이라 가까운 다른 구({others})의 곳도 함께 골랐어요."
+GU_FILL_MORE_NOTICE = "{gu} 안에는 더 보여드릴 곳이 {n}곳뿐이라 가까운 다른 구({others})의 곳도 함께 골랐어요."
 FAR_MORE_NOTICE = "{label} 근처(1.5km 안)에는 더 보여드릴 곳이 없어서 조금 떨어진 곳을 골랐어요."
 
 

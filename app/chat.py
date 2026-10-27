@@ -18,11 +18,12 @@ from app.dialog import (
     asked_fields, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
     intent_from_places, is_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference,
 )
-from app.catalog import EVENT_TYPE
+from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE
 from app.intent import CASUAL_RESPONSES, TOUR_TOPICS, TOUR_TYPES, detect_intent
 from app.llm import (
-    CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE, LLMUnavailable,
-    all_far, build_info_prompt, build_prompt, info_template_answer, mentions_far, mentions_missing, template_answer,
+    CLARIFY_ANSWER, FAR_MORE_NOTICE, GU_EMPTY_MORE_NOTICE, GU_EMPTY_NOTICE, GU_FILL_MORE_NOTICE, GU_FILL_NOTICE,
+    NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE, LLMUnavailable, all_far, build_info_prompt,
+    build_prompt, info_template_answer, mentions_far, mentions_missing, mentions_other_gu, template_answer,
 )
 from app.recommend import recommend
 from app.schemas import CenterOut, ChatRequest, ChatResponse
@@ -125,24 +126,61 @@ class ChatService:
         topic_label = TOUR_TOPICS[intent.topic].label if intent.topic else None
         missing_notice = (TOPIC_MISSING_NOTICE.format(where=f"{label}에서 " if label else "", topic=topic_label)
                           if rec.topic_missing else None)
+        # 구 기준점인데 구 안에 맞는 곳이 없거나 적어 다른 구 장소를 골랐으면 그 사실을 꼭 알린다 (QA-9, 같은 방식)
+        gu_notice, other_gus = self._gu_notice(rec, label, intent, more)
         try:
             answer = self.deps.llm.generate(
                 build_prompt(msg, history_texts, rec.places, label, rec.fallback_note, more=more,
                              far_notice=far_notice, topic_label=topic_label, topic_missing=rec.topic_missing,
-                             gu_wide=rec.gu_wide))
+                             gu_wide=rec.gu_wide, place_gus=rec.place_gus, gu_empty=rec.gu_empty,
+                             what=self._what(intent)[0]))
             if far_notice and not mentions_far(answer):
                 answer = f"{far_notice} {answer}"
             if missing_notice and not mentions_missing(answer):
                 answer = f"{missing_notice} {answer}"
+            told = mentions_other_gu(answer, other_gus) and (not rec.gu_empty or mentions_missing(answer))
+            if gu_notice and not told:
+                answer = f"{gu_notice} {answer}"
         except LLMUnavailable:
-            answer = template_answer(rec.places, label, far=far_notice is not None)
+            answer = template_answer(rec.places, label, far=far_notice is not None or rec.gu_empty)
             if rec.fallback_note and rec.places:
                 answer = f"{answer} ({rec.fallback_note})"
             if far_notice:
                 answer = f"{far_notice} {answer}"
             if missing_notice:
                 answer = f"{missing_notice} {answer}"
+            if gu_notice:
+                answer = f"{gu_notice} {answer}"
         return self._reply(sid, msg, answer, center=center_out, places=rec.places)
+
+    @staticmethod
+    def _what(intent) -> tuple[str, str]:
+        """안내 문장에 쓸 찾는 대상 이름 (그대로, 목적격)."""
+        types = intent.content_types or set()
+        if intent.cat3 == CAFE_CAT3:
+            return "카페", "카페를"
+        if types == {FOOD_TYPE}:
+            return "음식점", "음식점을"
+        if types == {EVENT_TYPE}:
+            return "축제·행사", "축제·행사를"
+        if types and types <= TOUR_TYPES | {EVENT_TYPE}:
+            return "관광지", "관광지를"
+        return "장소", "장소를"
+
+    @classmethod
+    def _gu_notice(cls, rec, gu, intent, more) -> tuple[str | None, list[str]]:
+        """구 결과에 다른 구 장소가 섞였을 때 앞에 붙일 안내 문장과 그 다른 구 이름들."""
+        if not rec.gu_wide or not rec.places:
+            return None, []
+        others = list(dict.fromkeys(rec.place_gus[p.id] for p in rec.places
+                                    if p.id in rec.place_gus and rec.place_gus[p.id] != gu))
+        if not others:
+            return None, []
+        if rec.gu_empty:
+            what, what_obj = cls._what(intent)
+            return (GU_EMPTY_MORE_NOTICE if more else GU_EMPTY_NOTICE).format(gu=gu, what=what, what_obj=what_obj), others
+        n = sum(1 for p in rec.places if rec.place_gus.get(p.id) == gu)
+        return (GU_FILL_MORE_NOTICE if more else GU_FILL_NOTICE).format(gu=gu, n=n, others="·".join(others)), others
 
     @staticmethod
     def _clarified_question(messages) -> str | None:
