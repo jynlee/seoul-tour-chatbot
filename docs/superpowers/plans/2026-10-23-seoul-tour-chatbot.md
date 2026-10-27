@@ -272,8 +272,8 @@ tests/js/*.test.mjs
   - `export function mulberry32(seed) -> () => number`; 시드 = `Math.round(center.lat*1e4) ^ Math.round(center.lng*1e4)`
   - `export function renderMap(el, {center, places, me, selectedId, onPinClick})` — 시안 `result-screen.html`의 스타일: 크림 바탕, 숲 덩어리, 점선 흰 길, 파스텔 블록(시드로 배치, 핀과 겹치지 않게), 한강은 bounds가 위도 37.505~37.545에 걸칠 때만 아래쪽 띠로, bounds 안의 `LANDMARKS`는 미니 일러스트, 물방울 핀(맛집 주황/관광 분홍)+이모지+흰 이름표, 선택 핀 1.25배, 내 위치 파란 점, 범례 "🧡 맛집 · 🩷 관광지 · 🔵 내 위치". **격자/초록 박스 금지.**
   - 핀 이모지: 카페 ☕, 그 외 음식점 🍽️, 관광지 🏯/🌳 등은 `category`로 고르되 기본값 📍.
-- [ ] **Step 1: 테스트** — `map.test.mjs`(`node --test tests/js`): 북쪽 장소의 `y`가 더 작음; 동쪽 장소의 `x`가 더 큼; 모든 점이 `0..width`, `0..height` 안; 한 점만 있을 때 bounds 폭 ≥ 600m; `(0,0)` 점은 bounds에 영향 없음; 같은 시드는 같은 수열.
-- [ ] **Step 2–4:** FAIL → 구현 → `node --test tests/js` PASS
+- [ ] **Step 1: 테스트** — `map.test.mjs`(`node --test "tests/js/*.test.mjs"`): 북쪽 장소의 `y`가 더 작음; 동쪽 장소의 `x`가 더 큼; 모든 점이 `0..width`, `0..height` 안; 한 점만 있을 때 bounds 폭 ≥ 600m; `(0,0)` 점은 bounds에 영향 없음; 같은 시드는 같은 수열.
+- [ ] **Step 2–4:** FAIL → 구현 → `node --test "tests/js/*.test.mjs"` PASS
 - [ ] **Step 5:** 임시 HTML로 광화문 예시(시안과 같은 4곳)를 그려 스크린샷 → 시안 `result-screen.html`과 비교.
 - [ ] **Step 6: Commit** — `feat: 일러스트 지도 렌더링`
 
@@ -294,7 +294,7 @@ tests/js/*.test.mjs
   - `export function chipLabel(place) -> string` — `"{emoji} {title} {walk_min}분"`(walk_min 없으면 분 생략)
 - 동작: 첫 전송 시 홈 → 결과 화면 전환; 응답 places가 비어 있지 않으면 **핀·칩·요약 바 교체**(누적 안 함), 비어 있으면 지도 유지; 핀/칩 클릭 → 카드 열기 + `selectedId` 저장(다음 요청 `selected_place_id`); "▾ 지도 접기" ⇄ "▴ 지도 펼치기"; 접힘 = 미니 썸네일 + "**{label} 근처** · 추천 N곳" + "지도 보기 ▾" + 가로 스크롤 칩(맛집 주황 테두리, 관광 분홍 테두리), 칩 클릭 시 지도 안 펼치고 카드; 전송 중 "…" 말풍선; 오류 시 오류 말풍선(`Error.message`); 새로고침 시 `fetchHistory`로 말풍선 + 마지막 장소 있는 봇 메시지의 지도 복원.
 - [ ] **Step 1: 테스트** — `view.test.mjs`: `cardHtml({tel:"",image:"",…})`에 "전화번호 정보 없음" 포함 ← Review Focus 4; `chipLabel({title:"광화문 세종클럽",kind:"food",walk_min:3,…})` → "🍽️ 광화문 세종클럽 3분".
-- [ ] **Step 2–4:** FAIL → 구현 → `node --test tests/js` PASS
+- [ ] **Step 2–4:** FAIL → 구현 → `node --test "tests/js/*.test.mjs"` PASS
 - [ ] **Step 5:** 서버(`uvicorn app.main:create_app --factory --port 8000`)로 모바일 보기 확인: "광화문 근처 맛집 추천해줘" → 핀 → 카드 → "거기 근처 카페 있어?" → 핀 교체 → 접기 → 칩 클릭 → 카드 → 새로고침 후 복원. 각 단계 스크린샷을 시안 3개와 비교. OpenSearch를 잠시 끄거나 잘못된 포트로 띄워 오류 말풍선 확인 ← Review Focus 2.
 - [ ] **Step 6: Commit** — `feat: 결과 화면, 정보 카드, 지도 접힘(B안)`
 
@@ -357,4 +357,4 @@ tests/js/*.test.mjs
 
 - 시작 전: Claude Code 재시작(Agent Teams 적용), 사용자가 `.env`에 OpenSearch·MySQL 계정과 `TOUR_API_KEY` 입력.
 - 리드가 T0 수행 후 공유 태스크 리스트에 B1~B6, F1~F4, Q1~Q2를 의존성과 함께 등록하고 팀원 3명을 띄운다. 각 팀원 프롬프트에 포함: 이 계획 경로, spec 경로, 담당 태스크, worktree 격리 + 태스크 단위 커밋, `TEAM-STATUS.md` 즉시 갱신 규칙(가이드 6장), 인터페이스는 SendMessage로 직접 조율, 태스크 끝날 때마다 사용자 보고.
-- 마무리: 리드가 worktree 브랜치들을 main에 합치고 전체 테스트(`pytest -m "not integration"`, `node --test tests/js`) 후 push.
+- 마무리: 리드가 worktree 브랜치들을 main에 합치고 전체 테스트(`pytest -m "not integration"`, `node --test "tests/js/*.test.mjs"`) 후 push.
