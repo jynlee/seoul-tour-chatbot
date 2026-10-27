@@ -23,6 +23,11 @@ _PARTICLE = re.compile(r"^(?:은|는|이|가|도)\s*")
 _HANGUL = re.compile(r"[가-힣]")
 _TRIM = re.compile(r"[\s?!.~,]+")
 
+# 괄호가 든 제목('대원군별장(석파정)', '길상사(서울)')은 사람들이 괄호를 뺀 이름이나 괄호 안 이름으로 부른다.
+# 괄호 안 말 중 이름이 아닌 것: 지역 표시('서울')·설명('실내'·'일본군 위안부')·지점('강남코엑스점')·옛 이름 설명('구 ○○')·한 글자
+_PAREN = re.compile(r"\s*\(([^)]*)\)\s*")
+_NOT_NAMES = {"서울", "실내", "실외", "일본군 위안부"}
+
 
 @dataclass
 class Center:
@@ -90,6 +95,36 @@ def _match_gu_alias(message: str) -> str | None:
     return None
 
 
+def title_aliases(title: str) -> list[str]:
+    """장소를 부르는 이름 후보: 원래 제목 + 괄호 뺀 이름 + (이름다운) 괄호 안 이름."""
+    names = [title]
+    base = " ".join(_PAREN.sub(" ", title).split())
+    if base != title and len(base.replace(" ", "")) >= 2:
+        names.append(base)
+    for inner in _PAREN.findall(title):
+        inner = " ".join(inner.split())
+        if (len(inner.replace(" ", "")) < 2 or inner in _NOT_NAMES or inner.startswith("구 ")
+                or inner.endswith("점") or inner in names):
+            continue
+        names.append(inner)
+    return names
+
+
+def _alias_used(alias: str, text: str) -> bool:
+    """이름이 질문에 장소로 쓰였는지 (영문은 대소문자 무시). 2글자 이하 이름은 장소로 쓰인 말이 따라올 때만."""
+    alias, text = alias.lower(), text.lower()
+    if alias not in text:
+        return False
+    return len(alias.replace(" ", "")) > SHORT_TITLE_LEN or _short_title_used_as_place(alias, text)
+
+
+def matched_alias(title: str, text: str, loose_title: bool = False) -> str | None:
+    """질문에 들어 있는 이 장소의 이름 중 가장 긴 것. loose_title: 원래 제목은 2글자 규칙 없이 부분 문자열로."""
+    hits = [a for i, a in enumerate(title_aliases(title))
+            if (loose_title and i == 0 and a in text) or _alias_used(a, text)]
+    return max(hits, key=len) if hits else None
+
+
 def _short_title_used_as_place(title: str, text: str) -> bool:
     if _TRIM.sub("", text) == title.replace(" ", ""):
         return True
@@ -104,9 +139,9 @@ def _short_title_used_as_place(title: str, text: str) -> bool:
 
 
 def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
-    """카탈로그 제목이 질문에 포함되면: 정확히 같은 제목 > 가장 긴 제목 > 가장 짧은 id."""
+    """장소 이름(괄호 뺀 이름·괄호 안 이름 포함)이 질문에 있으면: 정확히 같은 이름 > 가장 긴 이름 > 가장 짧은 id."""
     text = message.strip()
-    # 지역·구 이름과 같거나 그 안에 들어 있는 제목(예: '강남'=강남구, '강남역' 속 '강남')은 장소로 보지 않는다.
+    # 지역·구 이름과 같거나 그 안에 들어 있는 이름(예: '강남'=강남구, '강남역' 속 '강남')은 장소로 보지 않는다.
     # → 구/지역 이름이 같은 이름의 장소보다 우선.
     bigger_names = [n for n in AREAS if n in text]
     alias = _match_gu_alias(text)
@@ -114,16 +149,17 @@ def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
         bigger_names.append(alias)
     candidates = []
     for p in catalog.values():
-        if not p.title or not has_coords(p) or p.title not in text:
+        if not p.title or not has_coords(p):
             continue
-        if any(p.title in n for n in bigger_names):
+        hits = [a for a in title_aliases(p.title)
+                if _alias_used(a, text) and not any(a in n for n in bigger_names)]
+        if not hits:
             continue
-        if len(p.title.replace(" ", "")) <= SHORT_TITLE_LEN and not _short_title_used_as_place(p.title, text):
-            continue
-        candidates.append(p)
+        exact = any(a.lower() == text.lower() for a in hits)
+        candidates.append((not exact, -max(len(a) for a in hits), len(p.id), p.id, p))
     if not candidates:
         return None
-    return min(candidates, key=lambda p: (p.title != text, -len(p.title), len(p.id), p.id))
+    return min(candidates, key=lambda c: c[:4])[4]
 
 
 def _match_dong(message: str, catalog: dict[str, Place]) -> tuple[str, list[Place]] | None:

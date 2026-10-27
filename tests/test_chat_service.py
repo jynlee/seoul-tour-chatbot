@@ -171,3 +171,34 @@ def test_more_only_far_places_template_when_llm_down(small_catalog):
     assert r2.answer.startswith("인사동 근처(1.5km 안)에는 더 보여드릴 곳이 없어서 조금 떨어진 곳을 골랐어요.")
     assert "근처 추천 장소" not in r2.answer
     assert "km 떨어진" in r2.answer
+
+
+def test_api_clarify_then_name_only(tmp_path):
+    """API 멀티턴: 되묻기 뒤 장소 이름만 답하면 앞 질문(요금)에 답한다. 괄호 이름도 부르는 이름으로."""
+    import dataclasses
+
+    from app.catalog import load_catalog
+    from app.llm import CLARIFY_ANSWER
+
+    catalog = load_catalog("data/seoul_tour.json", tmp_path / "none.json")
+    sp = next(p for p in catalog.values() if p.title == "대원군별장(석파정)")
+    catalog[sp.id] = dataclasses.replace(sp, tel="02-395-0100", detail={"contact": "02-395-0100"})
+    client = TestClient(create_app(Deps(catalog=catalog, embedder=FakeEmbedder(),
+                                        searcher=FakeSearcher(catalog, scores={sp.id: 3.0}),
+                                        llm=FakeLLM(), history=InMemoryHistoryRepo())))
+
+    def say(sid, message):
+        r = client.post("/api/chat", json={"session_id": sid, "message": message})
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    r1 = say("s1", "종로 관광지 추천해줘")
+    assert "대원군별장(석파정)" in [p["title"] for p in r1["places"]]
+    r2 = say("s1", "석파정 무료 입장이야?")
+    assert "요금 정보는 없어요" in r2["answer"] and "02-395-0100" in r2["answer"]
+
+    assert say("s2", "종로 관광지 추천해줘")["places"]
+    assert say("s2", "무료 입장이야?")["answer"] == CLARIFY_ANSWER
+    r3 = say("s2", "대원군별장")
+    assert r3["places"] == [] and r3["center"] is None
+    assert "요금 정보는 없어요" in r3["answer"] and "02-395-0100" in r3["answer"]
