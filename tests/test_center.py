@@ -136,3 +136,17 @@ def test_history_gu_stays_gu(small_catalog):
         last_center = CenterOut(lat=37.56, lng=126.83, label="강서구", source=src)
         c = _resolve(small_catalog, "다른 데 더 추천해줘", last_center=last_center)
         assert (c.source, c.label) == ("gu", "강서구")
+
+
+def test_area_titled_place_never_matched(small_catalog):
+    from dataclasses import replace
+
+    from app.center import match_place
+
+    base = small_catalog["126512"]
+    cat = dict(small_catalog)
+    for pid, title in (("a1", "한강"), ("a2", "명동"), ("a3", "홍대"), ("a4", "강남"), ("a5", "서울")):
+        cat[pid] = replace(base, id=pid, title=title)
+    for q in ("한강 야경 볼 곳", "한강 근처 맛집", "명동 맛집", "홍대 근처 카페", "강남 맛집 추천", "한강", "서울 근처 맛집"):
+        assert match_place(q, cat) is None, q
+    assert match_place("광화문 근처 맛집", cat).id == "126512"  # 다른 장소 이름은 그대로

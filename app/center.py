@@ -50,6 +50,9 @@ def _gu_aliases() -> list[tuple[str, str]]:
 
 GU_ALIASES = _gu_aliases()
 
+# 지역 이름과 같은 제목의 장소('한강'·'명동'·'홍대'·'강남')는 사람들이 거의 늘 지역을 뜻해서 말한다 → 이름 찾기에서 뺀다.
+AREA_LIKE_TITLES = frozenset(AREAS) | {alias for alias, _gu in GU_ALIASES} | {"한강", "서울"}
+
 
 def dong_names(addr: str) -> set[str]:
     names = set()
@@ -152,7 +155,7 @@ def _match_place(message: str, catalog: dict[str, Place]) -> Place | None:
         if not p.title or not has_coords(p):
             continue
         hits = [a for a in title_aliases(p.title)
-                if _alias_used(a, text) and not any(a in n for n in bigger_names)]
+                if a not in AREA_LIKE_TITLES and _alias_used(a, text) and not any(a in n for n in bigger_names)]
         if not hits:
             continue
         exact = any(a.lower() == text.lower() for a in hits)
