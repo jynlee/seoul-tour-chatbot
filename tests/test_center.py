@@ -150,3 +150,13 @@ def test_area_titled_place_never_matched(small_catalog):
     for q in ("한강 야경 볼 곳", "한강 근처 맛집", "명동 맛집", "홍대 근처 카페", "강남 맛집 추천", "한강", "서울 근처 맛집"):
         assert match_place(q, cat) is None, q
     assert match_place("광화문 근처 맛집", cat).id == "126512"  # 다른 장소 이름은 그대로
+
+
+def test_history_center_from_place_keeps_place_id(small_catalog):
+    # "반포한강공원 근처 맛집" → "주변에 야경 명소는?": 이어받은 기준점이 장소면 그 장소 자신은 추천에서 빠지게 place_id 유지
+    for source in ("place", "history"):
+        last = CenterOut(lat=37.5760726, lng=126.9768042, label="광화문", source=source)
+        c = resolve_center("주변에 야경 명소는?", None, None, [], last, small_catalog)
+        assert (c.source, c.label, c.place_id) == ("history", "광화문", "126512")
+    area = CenterOut(lat=37.5760726, lng=126.9768042, label="광화문 일대", source="area")
+    assert resolve_center("주변에 야경 명소는?", None, None, [], area, small_catalog).place_id is None
