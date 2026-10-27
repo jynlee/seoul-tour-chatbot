@@ -122,12 +122,13 @@ def _paren_aliases(title: str) -> list[str]:
 
 def _heritage_aliases(title: str) -> list[str]:
     """문화재식 제목('서울 운현궁'·'창덕궁과 후원 [유네스코 세계유산]'·'[서울둘레길 3코스] 불암산코스'):
-    대괄호 설명을 뗀 이름 → 앞의 '서울 '을 뗀 이름 → 첫 낱말이 '○○과/와'면 그 앞 이름 (QA-10)."""
+    대괄호 설명을 뗀 이름 → 앞의 '서울 '을 뗀 이름 → 첫 낱말이 '○○과/와'면 그 앞 이름 (QA-10) → '○○&○○'의 앞 이름 (QA-10b)."""
     plain = " ".join(_BRACKET.sub(" ", _without_parens(title)).split())
     no_seoul = plain[len("서울 "):] if plain.startswith("서울 ") else plain
     head = _AND_HEAD.match(no_seoul)
+    amp = no_seoul.split("&")[0].strip() if "&" in no_seoul else ""  # '롯데월드타워&롯데월드몰' (QA-10b)
     names: list[str] = []
-    for name in (plain, no_seoul, head.group(1) if head else ""):
+    for name in (plain, no_seoul, head.group(1) if head else "", amp if len(amp.replace(" ", "")) >= 3 else ""):
         if len(name.replace(" ", "")) >= 2 and name != title and name not in names:
             names.append(name)
     return names

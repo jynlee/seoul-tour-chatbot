@@ -94,6 +94,18 @@ def test_lcls_tour_category():
         assert place_from_item(_new_item(ctype, code)).category == name, code
 
 
+def test_lcls_industry_museum_is_culture():
+    # 품질 ③: 신분류 '기타산업관광지'(EX061000)에 박물관이 섞여 있음 → 제목에 박물관·뮤지엄 등이 있으면 문화시설
+    from app.catalog import place_from_item
+
+    for title in ("국립민속박물관과 국립민속박물관 어린이박물관", "뮤지엄 김치간", "조선일보 뉴지엄", "크라운해태 키즈뮤지엄"):
+        assert place_from_item(_new_item("12", "EX061000", title=title)).category == "문화시설", title
+    assert place_from_item(_new_item("12", "EX061000", title="아리수나라")).category == "산업관광지"
+    # 옛 분류(cat3)가 있으면 그대로
+    old = _new_item("12", "EX061000", title="고촌이종근기념관", cat2="A0204", cat3="A02040800")
+    assert place_from_item(old).category == "산업관광지"
+
+
 def test_existing_cat_wins():
     from app.catalog import effective_codes
 
@@ -101,7 +113,7 @@ def test_existing_cat_wins():
     assert effective_codes(item) == ("A0502", "A05020100")
 
 
-# ---- 2026-10-27 데이터 확장 뒤 실제 데이터 (data/seoul_tour.json 3,444곳) ----
+# ---- 2026-10-27 데이터 확장 뒤 실제 데이터 (data/seoul_tour.json 3,441곳 = 합친 3,444곳 - 별칭 중복 3곳) ----
 
 def test_new_data_counts():
     from collections import Counter
@@ -109,7 +121,7 @@ def test_new_data_counts():
     from app.catalog import CAFE_CAT3
 
     catalog = load_catalog("data/seoul_tour.json", "data/seoul_tour_enriched.json")
-    assert len(catalog) == 3444
+    assert len(catalog) == 3441
     assert sum(has_coords(p) for p in catalog.values()) >= 3430
     assert "32" not in {p.content_type for p in catalog.values()}  # 숙박 없음
     assert Counter(p.category for p in catalog.values())["기타"] <= 1

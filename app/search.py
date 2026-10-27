@@ -24,7 +24,8 @@ class Embedder(Protocol):
 
 
 class Searcher(Protocol):
-    def knn(self, vector: list[float], content_types: set[str], cat3: str | None, k: int) -> list[tuple[str, float]]: ...
+    def knn(self, vector: list[float], content_types: set[str], cat3: str | None, k: int,
+            near: tuple[float, float, float] | None = None) -> list[tuple[str, float]]: ...
 
 
 def index_name_guard(name: str, write: bool = False) -> str:
@@ -45,10 +46,16 @@ def build_document_text(p: Place) -> str:
     return f"{text} {overview}" if overview else text
 
 
-def build_query(vector: list[float], content_types: set[str], cat3: str | None, k: int) -> dict:
+def build_query(vector: list[float], content_types: set[str], cat3: str | None, k: int,
+                near: tuple[float, float, float] | None = None) -> dict:
+    """near=(위도, 경도, 반경 m): 그 반경 안 장소에서만 kNN (lucene 엔진은 필터를 걸고 k개를 찾음 — 상위 k개를 먼저
+    뽑고 거르면 장소가 많은 동네에서 가까운 곳이 빠짐)."""
     filters: list[dict] = [{"terms": {"content_type": sorted(content_types)}}]
     if cat3:
         filters.append({"term": {"cat3": cat3}})
+    if near is not None:
+        lat, lng, radius_m = near
+        filters.append({"geo_distance": {"distance": f"{radius_m:g}m", "location": {"lat": lat, "lon": lng}}})
     return {
         "size": k,
         "_source": ["id"],
@@ -119,9 +126,9 @@ class OpenSearchSearcher:
         self._index = index_name_guard(settings.opensearch_index)
         self._client = client or make_client(settings)
 
-    def knn(self, vector, content_types, cat3, k):
+    def knn(self, vector, content_types, cat3, k, near=None):
         try:
-            result = self._client.search(index=self._index, body=build_query(vector, content_types, cat3, k))
+            result = self._client.search(index=self._index, body=build_query(vector, content_types, cat3, k, near))
         except Exception as e:  # 연결 실패·인덱스 없음 등 모두 검색 불가로 본다
             raise SearchUnavailable(str(e)) from e
         return [(hit["_source"]["id"], float(hit["_score"])) for hit in result["hits"]["hits"]]

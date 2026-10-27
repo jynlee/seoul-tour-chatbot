@@ -26,8 +26,8 @@ def test_within_radius_top5_sorted_by_distance(fake_embedder):
     assert all(p.walk_min >= 1 for p in rec.places)
     assert all(p.distance_m <= 1500 for p in rec.places)
     assert rec.fallback_note is None
-    # 점수 상위 5개(f0~f4)가 뽑힘
-    assert {p.id for p in rec.places} == {"f0", "f1", "f2", "f3", "f4"}
+    # 점수 상위 4개(f0~f3) + 반경 안 가장 가까운 곳(f5, 점수 꼴찌여도) — 품질 ①
+    assert {p.id for p in rec.places} == {"f0", "f1", "f2", "f3", "f5"}
 
 
 def test_none_within_radius_gives_nearest3_with_note(fake_embedder, small_catalog):
@@ -241,13 +241,16 @@ def test_center_place_parts_excluded_within_1km(fake_embedder):
         _tour("p4", "종묘 [유네스코 세계유산]", "역사관광지", 37.5744, 126.9940, "종로구"),
         _tour("p5", "창경궁", "역사관광지", 37.5788, 126.9948, "종로구"),
         _tour("p6", "창덕궁 소극장", "문화시설", 37.6200, 126.9200, "은평구"),  # 멀리 떨어진 같은 앞말
+        Place(id="p7", title="창덕궁 아트홀", content_type="14", kind="tour", category="문화시설", cat3="",
+              addr="서울 종로구 명륜동", tel="", lat=37.5870, lng=126.9910, image="", gu="종로구"),  # 850m, 이름만 빌린 공연장
     ]
     catalog = {p.id: p for p in places}
     center = Center(lat=37.5794, lng=126.9910, label=places[0].title, source="place", place_id="p1")
     rec = recommend("창덕궁 근처 관광지", detect_intent("창덕궁 근처 관광지"), center, FakeSearcher(catalog),
                     fake_embedder, catalog, radius_m=10_000)
     titles = [p.title for p in rec.places]
-    assert not any(t.startswith("창덕궁") and t != "창덕궁 소극장" for t in titles), titles
+    assert not any(t.startswith("창덕궁") and t not in ("창덕궁 소극장", "창덕궁 아트홀") for t in titles), titles
+    assert "창덕궁 아트홀" in titles  # 종류(문화시설)가 다른 별개 장소는 기준점 묶음으로 안 뺌
     assert "종묘 [유네스코 세계유산]" in titles and "창경궁" in titles
 
 
@@ -261,3 +264,55 @@ def test_center_place_group_keeps_restaurants_named_after_it(fake_embedder):
     center = Center(lat=37.5760, lng=126.9768, label="광화문", source="place", place_id="g1")
     rec = recommend("광화문 근처 맛집", detect_intent("광화문 근처 맛집"), center, FakeSearcher(catalog), fake_embedder, catalog)
     assert [p.title for p in rec.places] == ["광화문 세종클럽"]
+
+
+# ---- 품질 ①: 반경 기준점은 반경 안에서 kNN, 가장 가까운 곳은 늘 넣음 ----
+
+def test_radius_center_searches_within_radius(fake_embedder):
+    catalog = {p.id: p for p in _food_cluster(3)}
+    searcher = FakeSearcher(catalog)
+    recommend("광화문 근처 맛집", detect_intent("광화문 근처 맛집"), GWANGHWAMUN, searcher, fake_embedder, catalog)
+    assert searcher.calls[-1]["near"] == (GWANGHWAMUN.lat, GWANGHWAMUN.lng, 1500)
+
+
+def test_no_center_and_gu_center_search_without_near(fake_embedder, small_catalog):
+    searcher = FakeSearcher(small_catalog)
+    recommend("맛집", detect_intent("맛집"), None, searcher, fake_embedder, small_catalog)
+    gu = Center(lat=37.57, lng=126.98, label="종로구", source="gu")
+    recommend("종로 맛집", detect_intent("종로 맛집"), gu, searcher, fake_embedder, small_catalog)
+    assert [c["near"] for c in searcher.calls] == [None, None]
+
+
+def test_far_relevant_candidates_do_not_hide_near_ones(fake_embedder):
+    # kNN 상위 100곳이 다 반경 밖이어도 반경 안 장소를 찾음 (청계천 84m 음식점이 kNN 261위로 빠지던 문제)
+    far = [Place(id=f"x{i}", title=f"먼집{i}", content_type="39", kind="food", category="한식", cat3="A05020100",
+                 addr="서울 강남구", tel="", lat=37.50, lng=127.05, image="", gu="강남구") for i in range(150)]
+    near = _food_cluster(1)
+    catalog = {p.id: p for p in far + near}
+    rec = recommend("광화문 근처 맛집", detect_intent("광화문 근처 맛집"), GWANGHWAMUN, FakeSearcher(catalog),
+                    fake_embedder, catalog)
+    assert rec.places and rec.places[0].id == "f0" and rec.fallback_note is None
+
+
+def test_nearest_in_radius_found_even_beyond_knn_k(fake_embedder):
+    # 반경 안이 kNN 후보 수(100)보다 많아도 가장 가까운 곳은 들어감
+    catalog = {p.id: p for p in _food_cluster(130)}  # f129 가 가장 가까움, 점수는 꼴찌
+    for i in range(130):  # 모두 1.5km 안에 들게 촘촘히
+        p = catalog[f"f{i}"]
+        catalog[p.id] = Place(**{**p.__dict__, "lat": 37.5760 + 0.00005 * (130 - i)})
+    rec = recommend("광화문 근처 맛집", detect_intent("광화문 근처 맛집"), GWANGHWAMUN, FakeSearcher(catalog),
+                    fake_embedder, catalog)
+    assert "f129" in [p.id for p in rec.places]
+
+
+def test_one_per_group_sights_within_1km():
+    # 품질 ②: 큰 궁·산의 세부 관광지는 500m를 넘음(경복궁·경복궁 건청궁 805m) → 관광지(12)끼리는 1km 안이면 하나만
+    from app.recommend import one_per_group
+
+    a = _tour("a", "경복궁", "역사관광지", 37.5796, 126.9770, "종로구")
+    b = _tour("b", "경복궁 건청궁", "역사관광지", 37.5868, 126.9770, "종로구")  # 약 800m
+    c = Place(id="c", title="갤러리 현대", content_type="14", kind="tour", category="문화시설", cat3="",
+              addr="서울 종로구", tel="", lat=37.5800, lng=126.9810, image="", gu="종로구")
+    d = Place(id="d", title="갤러리 시몬", content_type="14", kind="tour", category="문화시설", cat3="",
+              addr="서울 종로구", tel="", lat=37.5853, lng=126.9810, image="", gu="종로구")  # 약 590m, 다른 갤러리
+    assert [p.id for p in one_per_group([a, b, c, d])] == ["a", "c", "d"]

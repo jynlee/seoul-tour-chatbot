@@ -13,6 +13,10 @@ MIN_PLACES = 3
 GROUP_RADIUS_M = 500
 # 기준점 장소의 세부 장소('창덕궁과 후원' 기준이면 '창덕궁 다래나무' 약 980m)는 더 넓게 뺀다 — 큰 궁·공원은 500m를 넘음
 CENTER_GROUP_RADIUS_M = 1000
+# 관광지(12)끼리는 더 넓게 — 경복궁·경복궁 건청궁 805m, 창덕궁 다래나무 980m. 다른 종류('갤러리 ○○'·'2026 ○○축제')는
+# 앞말만 같은 별개 장소가 많아 500m 그대로
+SIGHT_TYPE = "12"
+SIGHT_GROUP_RADIUS_M = 1000
 
 # 한 장소의 세부 장소('창덕궁 인정문'·'창덕궁 낙선재', '반포한강공원 달빛광장')는 제목 첫 단어가 같다 → 한 목록에 하나만.
 _BRACKETS = re.compile(r"[\(\[][^\)\]]*[\)\]]")
@@ -30,13 +34,18 @@ def group_key(title: str) -> str | None:
     return None if len(word) < 2 or word in _COMMON_FIRST_WORDS else word
 
 
+def _group_radius(a: Place, b: Place, meters: float) -> float:
+    return max(meters, SIGHT_GROUP_RADIUS_M) if a.content_type == b.content_type == SIGHT_TYPE else meters
+
+
 def one_per_group(places: list[Place], meters: float = GROUP_RADIUS_M) -> list[Place]:
-    """앞선 장소와 묶음 이름이 같고 meters 안이면 뺀다(순서 유지). 멀리 떨어진 같은 앞말(지점 등)은 남긴다."""
+    """앞선 장소와 묶음 이름이 같고 meters(관광지끼리는 1km) 안이면 뺀다(순서 유지). 멀리 떨어진 같은 앞말(지점 등)은 남긴다."""
     kept: list[Place] = []
     by_key: dict[str, list[Place]] = {}
     for p in places:
         key = group_key(p.title)
-        if key and any(haversine_m(p.lat, p.lng, q.lat, q.lng) <= meters for q in by_key.get(key, [])):
+        if key and any(haversine_m(p.lat, p.lng, q.lat, q.lng) <= _group_radius(p, q, meters)
+                       for q in by_key.get(key, [])):
             continue
         kept.append(p)
         if key:
@@ -98,15 +107,21 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
         skip.add(center.place_id)
     center_key = group_key(center_place.title) if center_place is not None and center_place.kind != "food" else None
 
-    def part_of_center(p: Place) -> bool:  # 음식점('광화문 ○○식당')은 이름만 빌린 다른 가게라 세부 장소가 아님
-        return (center_key is not None and p.kind != "food" and group_key(p.title) == center_key
+    def part_of_center(p: Place) -> bool:
+        # 종류가 같은 곳만 세부 장소로 봄 — '광화문 ○○식당'·'창덕궁 소극장'(명륜동 공연장)은 이름만 빌린 별개 장소
+        return (center_key is not None and p.content_type == center_place.content_type
+                and group_key(p.title) == center_key
                 and haversine_m(center_place.lat, center_place.lng, p.lat, p.lng) <= CENTER_GROUP_RADIUS_M)
 
     def ok(p: Place) -> bool:
         return p.id not in skip and has_coords(p) and _matches(p, intent) and not part_of_center(p)
 
+    gu = _gu_of_center(center)
+    # 반경 기준점(장소·지역·GPS·이어받은 곳)은 반경 안에서 kNN — 전체 상위 100곳에서 반경 안을 고르면 장소가 많은
+    # 동네에서 아주 가까운 곳이 빠짐(청계천 84m 음식점이 kNN 261위, 품질 ①). 구 기준점·기준점 없음은 그대로.
+    near = (center.lat, center.lng, radius_m) if center is not None and gu is None else None
     vector = embedder.encode(message)
-    hits = searcher.knn(vector, intent.content_types, intent.cat3, CANDIDATES_K)
+    hits = searcher.knn(vector, intent.content_types, intent.cat3, CANDIDATES_K, near=near)
 
     candidates: list[Place] = []
     seen = set()
@@ -133,7 +148,6 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
     def dist(p: Place) -> float:
         return haversine_m(center.lat, center.lng, p.lat, p.lng)
 
-    gu = _gu_of_center(center)
     if gu is not None:
         # kNN 상위 후보에 없던 같은 구 장소도 뒤에 붙인다 (구 안에서 빠지는 곳이 없게)
         # 구 이름과 같은 제목의 장소('강남')는 사용자가 말한 게 지역이므로 뺀다
@@ -154,7 +168,17 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
         return Recommendation(places=[to_place_out(p) for p in chosen], gu_wide=True, gu_empty=not in_gu,
                               place_gus={p.id: p.gu for p in chosen})
 
-    within = [(p, dist(p)) for p in candidates if dist(p) <= radius_m][:k]
+    in_radius = [p for p in candidates if dist(p) <= radius_m]
+    chosen_in = in_radius[:k]
+    if in_radius:
+        # 가장 가까운 곳(주제 맞는 곳 중)은 관련도가 낮아도 늘 넣음 — "근처"를 물었는데 84m 집이 빠지지 않게 (품질 ①)
+        # 반경 안이 100곳을 넘으면 kNN 후보에 없을 수 있어 카탈로그 전체에서 찾음
+        pool = [p for p in catalog.values() if ok(p) and dist(p) <= radius_m]
+        top = max(boost(p) for p in pool)
+        nearest_one = min((p for p in pool if boost(p) == top), key=dist)
+        if nearest_one not in chosen_in:
+            chosen_in = chosen_in[:k - 1] + [nearest_one]
+    within = [(p, dist(p)) for p in chosen_in]
     if within:
         if len(within) < MIN_PLACES:
             # 반경 안이 1~2곳이면 같은 조건의 가장 가까운 곳으로 3곳까지 채운다 (거리·도보 시간은 그대로 보여줌)
