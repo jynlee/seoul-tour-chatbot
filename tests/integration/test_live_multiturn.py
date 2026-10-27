@@ -280,3 +280,34 @@ def test_live_alias_not_names(live):
     for message in ["서울 관광지 추천해줘", "실내 관광지 추천해줘", "공기 좋은 산책 코스 추천해줘"]:
         r = Talk(client, sessions).say(message)
         assert r["center"] is None or r["center"]["source"] != "place", (message, r["center"])
+
+
+# ---------------------------------------------------------------- QA-9 (c9cace1·de019c1): 구 안에 0~2곳이어도 거리 null + 다른 구 안내
+
+def tells_other_gu(answer, gus):
+    return "다른 구" in answer or any(g in answer for g in gus)
+
+
+@pytest.mark.parametrize("turns", [["강서구 카페 추천해줘"], ["강서구 공원 추천해줘", "카페는?"]])
+def test_live_qa9_gu_empty(live, turns):
+    client, _, deps, sessions = live
+    t = Talk(client, sessions)
+    for m in turns:
+        r = t.say(m)
+    assert r["center"]["source"] == "gu" and r["center"]["label"] == "강서구"
+    assert len(r["places"]) >= 3 and no_distance(r), r["places"]
+    gus = {deps.catalog[i].gu for i in ids(r)}
+    assert "강서구" not in gus
+    assert tells_other_gu(r["answer"], gus), r["answer"]
+
+
+def test_live_qa9_gu_fill_and_enough(live):
+    client, _, deps, sessions = live
+    r = Talk(client, sessions).say("금천구 맛집 추천해줘")
+    gus = [deps.catalog[i].gu for i in ids(r)]
+    assert r["center"]["source"] == "gu" and no_distance(r)
+    assert gus[0] == "금천구" and len(gus) == 3, gus
+    assert tells_other_gu(r["answer"], set(gus) - {"금천구"}), r["answer"]
+    r = Talk(client, sessions).say("강남구 맛집 추천해줘")
+    assert no_distance(r) and {deps.catalog[i].gu for i in ids(r)} == {"강남구"}
+    assert "다른 구" not in r["answer"], r["answer"]

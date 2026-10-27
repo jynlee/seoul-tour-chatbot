@@ -12,7 +12,10 @@ from app.chat import Deps
 from app.geo import haversine_m
 from app.history import InMemoryHistoryRepo
 from app.intent import matches_topic
-from app.llm import CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE
+from app.llm import (
+    CLARIFY_ANSWER, FAR_MORE_NOTICE, GU_EMPTY_MORE_NOTICE, GU_EMPTY_NOTICE, GU_FILL_MORE_NOTICE, GU_FILL_NOTICE,
+    NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE,
+)
 from app.main import create_app
 from tests.conftest import SMALL_PLACES, FakeEmbedder, FakeLLM, FakeSearcher
 
@@ -467,15 +470,80 @@ def test_gu_carried_twice_stays_gu(real_catalog):
     assert_gu_no_distance(api.say("다른 데 더 추천해줘"), "마포구")
 
 
-@pytest.mark.xfail(strict=True, reason="QA-9: 구 안에 맞는 곳이 0이면 가장 가까운 곳 대체로 빠져 source=gu인데 거리 int")
 @pytest.mark.parametrize("turns", [["강서구 카페 추천해줘"], ["강서구 공원 추천해줘", "카페는?"]])
 def test_qa9_gu_with_no_match_still_no_distance(real_catalog, turns):
-    """강서구엔 카페가 0곳(카탈로그 카페 14곳) → 지금은 용산구 카페가 12838m·192분으로 나옴.
-    프론트는 walk_min이 숫자면 '🚶 강서구에서 약 192분'·칩 '192분'을 그려 QA-8 이전 문제가 그대로 보임."""
+    """QA-9(c9cace1): 강서구엔 카페가 0곳(카탈로그 카페 14곳) → 다른 구 카페로 채워도 source gu·거리 null
+    (예전엔 용산구 카페가 12838m·192분으로 나와 화면에 '🚶 강서구에서 약 192분'이 보였음)."""
     api = Api(real_catalog)
     for t in turns:
         r = api.say(t)
     assert_gu_no_distance(r, "강서구")
+    assert len(r["places"]) >= 3 and "강서구" not in gu_of(real_catalog, r)
+
+
+@pytest.mark.parametrize("turns", [["강서구 카페 추천해줘"], ["강서구 공원 추천해줘", "카페는?"]])
+def test_qa9_gu_empty_notice(real_catalog, turns):
+    """구 안에 0곳 → 답 첫머리에 '강서구 안에는 카페 정보가 없어서, 가까운 다른 구의 카페를 보여 드려요.'
+    LLM 다운(템플릿)·LLM이 다른 구를 말 안 함 두 경우 모두."""
+    notice = GU_EMPTY_NOTICE.format(gu="강서구", what="카페", what_obj="카페를")
+    for llm in (FakeLLM(fail=True), FakeLLM("가짜 답변이에요.")):
+        api = Api(real_catalog, llm=llm)
+        for t in turns:
+            r = api.say(t)
+        assert r["answer"].startswith(notice), r["answer"]
+        assert "근처" not in r["answer"]
+
+
+def test_qa9_notice_skipped_when_llm_names_other_gu(real_catalog):
+    """LLM 답이 다른 구 이름을 이미 말하고 '없다'고 하면 안내를 덧붙이지 않음."""
+    api = Api(real_catalog, llm=FakeLLM("강서구에는 카페 정보가 없어서 용산구와 종로구 카페를 골랐어요."))
+    r = api.say("강서구 카페 추천해줘")
+    assert r["answer"] == "강서구에는 카페 정보가 없어서 용산구와 종로구 카페를 골랐어요."
+
+
+def test_qa9_gu_empty_prompt_rule(real_catalog):
+    """프롬프트: 구 안에 없다는 규칙 + 장소마다 '구: 용산구 (강서구 밖의 다른 구)'."""
+    api = Api(real_catalog)
+    api.say("강서구 카페 추천해줘")
+    prompt = api.last_prompt()
+    assert "'강서구' 안에는 맞는 카페 정보가 없어서" in prompt
+    assert "(강서구 밖의 다른 구)" in prompt and "/ 도보 " not in prompt
+
+
+def test_qa9_gu_fill_notice(real_catalog):
+    """금천구 음식점은 1곳 → 다른 구(영등포구·관악구)로 3곳 채움 + 안내, 거리 null, 금천구 장소가 1번."""
+    api = Api(real_catalog, llm=FakeLLM("가짜 답변이에요."))
+    r = api.say("금천구 맛집 추천해줘")
+    assert_gu_no_distance(r, "금천구")
+    gus = [real_catalog[p["id"]].gu for p in r["places"]]
+    assert gus[0] == "금천구" and gus.count("금천구") == 1 and len(gus) == 3
+    others = "·".join(dict.fromkeys(g for g in gus if g != "금천구"))
+    assert r["answer"].startswith(GU_FILL_NOTICE.format(gu="금천구", n=1, others=others)), r["answer"]
+
+
+def test_qa9_gu_more_notices(real_catalog):
+    """'다른 데 더': 0곳 → GU_EMPTY_MORE_NOTICE, 금천구(남은 0곳) → 음식점 EMPTY_MORE."""
+    api = Api(real_catalog, llm=FakeLLM(fail=True))
+    api.say("강서구 카페 추천해줘")
+    r = api.say("다른 데 더 추천해줘")
+    assert_gu_no_distance(r, "강서구")
+    assert r["answer"].startswith(GU_EMPTY_MORE_NOTICE.format(gu="강서구", what="카페", what_obj="카페를")), r["answer"]
+    api = Api(real_catalog, llm=FakeLLM(fail=True))
+    api.say("금천구 맛집 추천해줘")
+    r = api.say("다른 데 더 추천해줘")
+    assert_gu_no_distance(r, "금천구")
+    assert r["answer"].startswith(GU_EMPTY_MORE_NOTICE.format(gu="금천구", what="음식점", what_obj="음식점을")), r["answer"]
+    assert GU_FILL_MORE_NOTICE  # 1~2곳 남은 '다른 데 더' 문구는 백엔드 단위 테스트가 확인
+
+
+def test_qa9_enough_in_gu_has_no_notice(real_catalog):
+    """강남구 맛집은 구 안에 충분 → 안내 없음, 모두 강남구."""
+    for llm in (FakeLLM(fail=True), FakeLLM("가짜 답변이에요.")):
+        api = Api(real_catalog, llm=llm)
+        r = api.say("강남구 맛집 추천해줘")
+        assert_gu_no_distance(r, "강남구")
+        assert gu_of(real_catalog, r) == {"강남구"}
+        assert "다른 구" not in r["answer"] and "정보가 없어서" not in r["answer"], r["answer"]
 
 
 @pytest.mark.parametrize("message, source", [

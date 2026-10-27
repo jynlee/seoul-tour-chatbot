@@ -220,6 +220,19 @@ try {
     foldW2.includes(`강서구 · 추천 ${wa2.length}곳`) && !foldW2.includes('근처') && wchips2.every((c) => !/\d+분/.test(c))
     && wa2.every((x) => x.distance_m === null),
     `${foldW2.replace(/\n/g, ' ')} / ${wchips2.join(' | ')}`);
+  // QA-9: 구 안에 카페 0곳 → 다른 구 카페, 화면에 🚶·분 없음, 요약 바 "강서구 · 추천 N곳", 답에 다른 구 안내
+  const wq = await send(w, '카페는?');
+  const wqa = await apiPlaces(w);
+  const wqchips = await chipTitles(w);
+  const wqfold = await foldText(w);
+  await w.eval(`document.querySelector('#map .pin[data-id="${wqa[0].id}"]').click()`);
+  await sleep(300);
+  const wqcard = await w.eval(`document.querySelector('#card').innerText`);
+  await w.shot(`${SHOTS}/b89-17-qa9-gu-empty.png`);
+  check('QA-9', '"강서구 공원" 뒤 "카페는?" → 다른 구 카페, 요약 바 "강서구 · 추천 N곳", 카드·칩에 도보/분 없음, 다른 구 안내',
+    wqfold.includes(`강서구 · 추천 ${wqa.length}곳`) && !wqcard.includes('🚶') && wqchips.every((c) => !/\d+분/.test(c))
+    && wqa.every((x) => x.distance_m === null && x.walk_min === null) && /다른 구|용산구|종로구/.test(wq.text),
+    `${wqfold} / ${wqchips.join(' | ')} / 카드: ${wqcard.replace(/\n/g, ' / ')} / ${wq.text}`);
   const wb2 = await send(w, '금천구 산책할 곳');
   await w.shot(`${SHOTS}/b89-13-topic-missing.png`);
   check('GU-2', '"금천구 산책할 곳" → 맞는 곳이 없다고 솔직히 안내 + 핀', /없|못 찾|어려|아쉽/.test(wb2.text) && (await pins(w)).length > 0, wb2.text);
