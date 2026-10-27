@@ -1,0 +1,211 @@
+/* 서울 여행 친구 — 확정 시안(docs/superpowers/mockups) 색·크기를 393px 폭 기준으로 옮김 */
+:root {
+  --pink: #ff8fa3;
+  --orange: #ff9f43;
+  --cream: #fdf6e3;
+  --bg-top: #ffe9f0;
+  --bg-bottom: #fff6e8;
+  --pink-line: #ffc2cf;
+  --pink-soft: #ffd6df;
+  --ink: #333;
+  --brown: #5a4632;
+  --muted: #aaa;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: linear-gradient(var(--bg-top), var(--bg-bottom)) fixed;
+  color: var(--ink);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+[hidden] { display: none !important; }
+
+.app {
+  max-width: 430px;
+  margin: 0 auto;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(var(--bg-top), var(--bg-bottom));
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---------- 첫 화면 S2a ---------- */
+.home { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.home-art { display: block; width: 100%; flex-shrink: 0; }
+/* 포인터를 따라다니는 🎒 (follower.js) — 클릭을 막지 않음 */
+.follower {
+  position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; user-select: none;
+  font-size: 24px; line-height: 1; opacity: 0; transition: opacity .35s ease;
+  will-change: transform; filter: drop-shadow(0 2px 2px rgba(200, 90, 120, .25));
+}
+.follower.show { opacity: 1; }
+.hello { padding: 4px 18px 10px; line-height: 1.45; font-size: 15px; }
+.hello b { font-size: 19px; display: block; margin-bottom: 1px; }
+.home-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
+.home-chip {
+  font-size: 12.5px; padding: 5px 10px; border-radius: 999px; background: #fff; white-space: nowrap;
+  border: 2px solid var(--pink-line); box-shadow: 0 1px 0 var(--pink-line);
+}
+.home-chip:active { transform: translateY(1px); box-shadow: none; }
+
+/* ---------- 입력창 ---------- */
+.inp {
+  margin: 0 13px 13px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  background: #fff; border-radius: 999px; padding: 6px 8px 6px 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
+}
+.inp input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+  font: inherit; font-size: 15px; color: var(--ink); padding: 5px 0;
+}
+.inp input::placeholder { color: var(--muted); }
+.inp .gps {
+  margin-left: auto; border: 0; background: transparent; font-size: 18px;
+  width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.inp .gps.on { background: #e9f1ff; box-shadow: 0 0 0 2px #4f8cff55; }
+
+/* ---------- 일러스트 지도 (시안 result-screen.html) ---------- */
+.map {
+  position: relative; margin: 0 13px; flex-shrink: 0;
+  aspect-ratio: 4 / 3.5; border-radius: 26px; overflow: hidden;
+  border: 3px solid #fff; box-shadow: 0 2px 10px rgba(220, 120, 150, .2);
+  background: var(--cream);
+}
+/* 펼친 지도 바로 아래 얇은 손잡이 "▴ 지도 접기" (예전 상단 바 토글 글자 모양 그대로) */
+.handle {
+  display: block; width: 100%; flex-shrink: 0; text-align: center;
+  border: 0; background: none; padding: 4px 0; color: #c07a8a; font-size: 14px;
+}
+.map svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pin {
+  position: absolute; transform: translate(-50%, -42px);
+  display: flex; flex-direction: column; align-items: center;
+  background: none; border: 0; padding: 0; margin: 0;
+  font-size: 12px; font-weight: 700; color: var(--brown); z-index: 1;
+}
+.pin .head {
+  width: 36px; height: 36px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  display: flex; align-items: center; justify-content: center;
+  border: 2.5px solid #fff; box-shadow: 0 2px 5px rgba(0, 0, 0, .25); transition: transform .15s;
+}
+.pin .head span { transform: rotate(45deg); font-size: 18px; line-height: 1; }
+.pin.on { z-index: 3; }
+.pin.on .head { transform: rotate(-45deg) scale(1.25); }
+.pin .lbl {
+  margin-top: 4px; background: #fff; padding: 1px 8px; border-radius: 9px; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .15); max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+}
+.pin.on .lbl { margin-top: 9px; }
+.pin.nolbl .lbl { visibility: hidden; }
+.pin.tour .head { background: var(--pink); }
+.pin.food .head { background: var(--orange); }
+.me {
+  position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #4f8cff;
+  border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(79, 140, 255, .2); transform: translate(-50%, -50%); z-index: 0;
+}
+.legend {
+  position: absolute; left: 10px; bottom: 10px; background: #fffd; padding: 3px 10px;
+  border-radius: 10px; font-size: 12px; color: var(--brown); z-index: 4;
+}
+.legend.up { bottom: auto; top: 10px; } /* .top은 상단 바 클래스와 겹쳐서 쓰지 않음 */
+
+/* ---------- 결과 화면 (시안 result-screen.html / result-folded-b.html) ---------- */
+.result { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.top {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px; font-weight: 700; font-size: 17px; flex-shrink: 0;
+}
+/* 워드마크 시안 A: 랜드마크 배지(40px) + Jua "서울 여행친구" 두 색 */
+.top .brand { display: inline-flex; align-items: center; gap: 8px; }
+.top .badge { width: 40px; height: 40px; flex-shrink: 0; perspective: 200px; }
+.top .badge svg { display: block; width: 40px; height: 40px; }
+.top .brand-name {
+  font-family: "Jua", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  font-weight: 400; font-size: 21px; line-height: 1.2; color: var(--brown);
+}
+.top .brand-name .seoul { color: #ff6f8d; }
+/* "새 대화": 예전 상단 "지도 접기" 토글 글자 모양 그대로 */
+.top .newchat {
+  border: 0; background: none; padding: 4px 0; font-weight: 400; color: #c07a8a; font-size: 14px;
+}
+
+/* 정보 카드 */
+.card {
+  position: relative; margin: 10px 13px 0; flex-shrink: 0;
+  background: #fff; border-radius: 22px; box-shadow: 0 6px 16px rgba(200, 90, 120, .15);
+  padding: 12px; display: flex; gap: 12px;
+  animation: pop .18s ease-out;
+}
+@keyframes pop { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+.card .img {
+  position: relative; width: 80px; height: 80px; border-radius: 17px; flex-shrink: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; font-size: 36px;
+}
+.card .img.food { background: #ffe2c4; }
+.card .img.tour { background: #ffd9e1; }
+.card .img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.card .body { flex: 1; min-width: 0; }
+.card .name { padding-right: 18px; }
+.card b { font-size: 17px; }
+.card .row { font-size: 14px; color: #666; margin-top: 4px; line-height: 1.35; word-break: keep-all; overflow-wrap: break-word; }
+.card .row .none { color: #aaa; }
+.card .tag { display: inline-block; font-size: 12px; padding: 1px 9px; border-radius: 999px; margin-left: 5px; vertical-align: 2px; }
+.card .tag.food { background: #fff1e0; color: #c46a12; }
+.card .tag.tour { background: #ffe6ec; color: #c4506b; }
+.card .x {
+  position: absolute; top: 8px; right: 10px; border: 0; background: none; color: #bbb; font-size: 16px; padding: 4px;
+}
+
+/* 대화 */
+.chat { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 16px; scroll-behavior: smooth; }
+.bub { padding: 10px 15px; border-radius: 20px; margin: 8px 0; max-width: 86%; line-height: 1.45; width: fit-content; word-break: keep-all; overflow-wrap: break-word; }
+.bub.u { background: var(--pink); color: #fff; margin-left: auto; border-bottom-right-radius: 6px; }
+.bub.b { background: #fff; border-bottom-left-radius: 6px; box-shadow: 0 1px 0 var(--pink-soft); }
+.bub.err { color: #c4506b; box-shadow: 0 0 0 1.5px #ffb3c1; }
+.bub.typing { display: flex; gap: 5px; padding: 14px 16px; }
+.bub.typing i { width: 7px; height: 7px; border-radius: 50%; background: #e3a6b4; animation: blink 1s infinite ease-in-out; }
+.bub.typing i:nth-child(2) { animation-delay: .15s; }
+.bub.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+/* 접힘 B안: 요약 바 + 장소 칩 */
+.fold {
+  margin: 0 13px; flex-shrink: 0; width: auto; text-align: left;
+  background: #fff; border: 0; border-radius: 22px; padding: 11px 15px;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 2px 10px rgba(220, 120, 150, .18); font-size: 15px;
+}
+.fold .mini {
+  width: 56px; height: 38px; border-radius: 11px; background: var(--cream); position: relative;
+  overflow: hidden; flex-shrink: 0; border: 2px solid #ffe0e8;
+}
+.fold .mini i { position: absolute; width: 9px; height: 9px; border-radius: 50%; transform: translate(-50%, -50%); }
+.fold .sum { min-width: 0; display: flex; white-space: nowrap; }
+.fold .sum b { overflow: hidden; text-overflow: ellipsis; }
+.fold .sum span { flex-shrink: 0; margin-left: .3em; }
+.fold .open { margin-left: auto; color: #ff6b8a; font-weight: 700; font-size: 14px; white-space: nowrap; }
+.chips {
+  display: flex; gap: 8px; overflow-x: auto; padding: 10px 13px 2px; flex-shrink: 0;
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0; background: #fff; border-radius: 999px; padding: 6px 13px; font-size: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .08); border: 2px solid; white-space: nowrap;
+}
+.chip.food { border-color: #ffc58f; }
+.chip.tour { border-color: #ffb3c1; }
+.chip[aria-pressed="true"] { background: #fff7f9; }
+.chip.food[aria-pressed="true"] { border-color: var(--orange); }
+.chip.tour[aria-pressed="true"] { border-color: var(--pink); }
+.inp .gps.wait { opacity: .5; animation: blink 1s infinite ease-in-out; }
+.inp .gps:disabled { cursor: default; }

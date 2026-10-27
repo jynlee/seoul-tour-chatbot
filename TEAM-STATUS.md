@@ -13,7 +13,7 @@
 |---|---|---|
 | 리드 | T0, 병합·최종 확인 | main |
 | 팀원1 backend | B1~B6 | `feat/backend` |
-| 팀원2 frontend | F1~F4 | worktree 브랜치 (시작 시 기록) |
+| 팀원2 frontend | F1~F4 | `feat/frontend` |
 | 팀원3 qa | Q1~Q2 (B6 완료 후 시작) | worktree 브랜치 (시작 시 기록) |
 
 ## ③ 태스크 분해 (공유 태스크 리스트)
@@ -29,14 +29,14 @@
 | B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ✅ 팀원1 |
 | B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ✅ 팀원1 |
 | B7 | 관광공사 상세 정보 보강(detailIntro2 → detail) | 팀원1 | B1 | ✅ 팀원1 (574/574, 2026-10-26) |
-| B8 | 장소 정보 질문 의도(place_info) | 팀원1 | B6, B7 | ✅ 팀원1 (팀원3 검증 대기) |
-| B9 | 멀티턴(순서·이름 지칭, "다른 데 더", 조건 이어받기, 프롬프트에 최근 대화) | 팀원1 | B8 | ✅ 팀원1 (팀원3 검증 대기) |
-| F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ⬜ |
-| F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ⬜ |
-| F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ⬜ |
-| F4 | GPS 위치 | 팀원2 | F3 | ⬜ |
-| Q1 | API 테스트 스위트 | 팀원3 | **B6** | ⬜ |
-| Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | ⬜ |
+| B8 | 장소 정보 질문 의도(place_info) | 팀원1 | B6, B7 | ✅ 팀원1 · ✅ 팀원3 검증(de019c1+f413aea, QA-4~9 통과) |
+| B9 | 멀티턴(순서·이름 지칭, "다른 데 더", 조건 이어받기, 프롬프트에 최근 대화) | 팀원1 | B8 | ✅ 팀원1 · ✅ 팀원3 검증(de019c1+f413aea, QA-4~9 통과) |
+| F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ✅ 팀원2 |
+| F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ✅ 팀원2 |
+| F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ✅ 팀원2 |
+| F4 | GPS 위치 | 팀원2 | F3 | ✅ 팀원2 |
+| Q1 | API 테스트 스위트 | 팀원3 | **B6** | ✅ 팀원3 |
+| Q2 | 통합·화면 시나리오 점검 | 팀원3 | F3, F4 | ✅ 팀원3 |
 
 ## ④ 합의된 인터페이스
 **초안 (T0, 리드):** `app/schemas.py` — `ChatRequest{session_id?, message(1~500자, 앞뒤 공백 제거), location?{lat,lng}, selected_place_id?}` → `ChatResponse{session_id, answer, center?{lat,lng,label,source: gps|place|area|gu|history}, places[PlaceOut{id,title,kind: food|tour,category,addr,tel,lat,lng,image,distance_m?,walk_min?}]}` / `GET /api/history/{session_id}` → `{session_id, messages[{role,message,center?,places,created_at}]}` / `GET /api/health` → `{opensearch,ollama,mysql: bool}` / 503 `detail`: "검색 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."
@@ -73,6 +73,7 @@
 
 ## ⑦ 팀원별 작업 로그 (컨텍스트 노트)
 명단(agentId): 리드가 팀원을 띄운 뒤 기록.
+- 팀원1 backend: `aba34c491b89ebbac`
 - 팀원2 frontend: `a3f8272f943c570fa` (팀원1이 리드에게 받아 기록)
 - 팀원3 qa: `a3b7fc5a951212262` (팀원1이 리드에게 받아 기록)
 
@@ -141,10 +142,55 @@
 - 알려진 한계: 임베딩 문장(`build_document_text`)에 설명이 없어 kNN만으로는 '산책'과 공원이 잘 안 맞음 → 주제 가산점으로 보완(재색인 안 함). 북촌처럼 반경 1.5km 안에 공원이 없으면 "없다"고 답함. 3글자 장소명(`고기다`·`골목집`·`그래픽`·`국시집` 등)도 일반 단어와 겹칠 수 있음(2글자만 규칙 적용). 2글자 규칙은 "기후 어때?"처럼 장소 쓰임 말 없이 물으면 장소로 안 봄(일부러 보수적으로).
 
 ### 팀원2 frontend
--
+- 브랜치 `feat/frontend`. 팀원1(backend) agentId `aba34c491b89ebbac`로 API 조율.
+- F1 완료: `static/index.html`, `css/app.css`, `js/landmarks.js`(시안 SVG 그대로), `js/home.js`(renderHome·S2a), `js/app.js`. 입력창(`#inp`)은 홈/결과 공용으로 index.html에 고정.
+- 결정: 계획과 달리 DOM에 의존하지 않는 모듈은 따로 뺌 — `home.js`(renderHome), F3의 `view.js`(cardHtml·chipLabel), F4의 `geo.js`(requestLocation). app.js는 import 시 DOM을 건드려서 node 테스트에서 import 불가하기 때문.
+- 결정: 크기는 결과 시안(폰 폭 300px) → 393px 기준 약 1.3배로 맞춤. 첫 화면 칩 3개(📍 내 주변 맛집·🏯 종로 관광지·☕ 성수 카페)가 한 줄에 들어가게 12.5px.
+- API 계약: 팀원1과 2026-10-23 합의(④). 핀 이모지는 category 키워드로 고름(카페/전통찻집→☕, food→🍽️, 역사→🏯, 자연·휴양·공원→🌳, 쇼핑→🛍️, 문화→🏛️, 축제·행사·공연→🎉, 레포츠→🏃, 기본 📍).
+- F2 완료: `static/js/map.js`(computeBounds·project·mulberry32·seedFor·riverVisible·renderMap), `emoji.js`(placeEmoji), `util.js`(esc), `tests/js/map.test.mjs` 11개 통과.
+- 결정(지도): 기준점 900m 안의 6대 랜드마크는 범위에 포함해서 미니 일러스트가 보이게 함(광화문→경복궁). 한강 물빛은 S2a처럼 **짧은 직선**만(시안 결과 화면의 q 곡선은 '흰 곡선' 안티목표와 헷갈려서 뺌). 이름표끼리 겹치면 순위 낮은 장소 이름표만 숨김(핀은 그대로). 핀은 물방울 끝이 좌표에 오도록 배치. 선택 핀이 있으면 내 위치(없으면 기준점)에서 점선 '걸어서' 경로.
+- F2 리뷰 반영(537b109): 핀 밀어내기(spreadPins), 길은 강 앞에서 끝나고 세로 큰길만 다리, 강 있으면 범례 위쪽.
+- F3 화면(가짜 API로 확인): `api.js`(sendChat·fetchHistory, 실패 시 한국어 Error), `view.js`(cardHtml·chipLabel·bubbleHtml·foldBarHtml·placeChipsHtml), `app.js` 상태·이벤트. 테스트 26개 통과. **미완성: 실제 백엔드(B6) 연동 확인 전.**
+- 결정(F3): 카드 ✕로 닫아도 `selectedId`는 남겨서 다음 요청 `selected_place_id`로 보냄(새 추천이 오면 초기화). 걷는 점선은 내 위치(GPS)가 있을 때만(기준점엔 표시가 없어 선이 허공에서 시작해 보여서). 첫 추천 전에는 지도 자리를 숨기고 대화만 보임. 새로고침 복원 실패 시 첫 화면 유지.
+- 확인 도구(저장소 밖): 가짜 API 서버 `scratchpad/mock_server.py <static경로> 8002`와 iframe 하네스 `/__h/harness.html#reset;send:…;click:…`로 클릭 시나리오 스크린샷.
+- F4 완료(1af1537): `geo.js` requestLocation(미지원/거부/실패 문구, 8초), 📍 누르면 `pendingLocation` + 입력창 "📍 현재 위치 사용 중"·버튼 강조, 다시 누르면 취소, 다음 전송에 한 번 실어 보내고 비움. "📍 내 주변 맛집" 칩은 위치 요청 후 전송(실패해도 오류 말풍선 후 location null로 전송).
+- 첫 화면 수정(f3b86e0, 사용자 요청): 🍜 핀 삭제, 포인터를 따라다니는 🎒(`follower.js`, 첫 화면에서만, 결과 화면 가면 해제).
+- **F3·F4 실제 연동 확인 완료**(feat/backend 병합 a8c27d1, uvicorn 8000): 광화문 맛집 5곳 핀 → 개성만두 궁 카드 → "거기 근처 카페 있어?" 핀 교체(카페 3곳) → 접기·칩→카드 → "고마워!" 지도 유지 → 새로고침 복원(성수 카페) → GPS(가짜 geo 좌표 주입)로 내 위치 파란 점·걸어서 점선 → OPENSEARCH_PORT=9299로 띄운 서버에서 503 오류 말풍선. 스크린샷 `scratchpad/shots/real-*.png`.
+- 연동 중 고친 것: 채팅 fetch 90초 타임아웃(첫 Ollama 호출이 느림, "답변이 너무 오래 걸려요" 문구), 강 있을 때 범례 클래스 `.top`이 상단 바 `.top` CSS와 겹쳐 글자가 커지던 버그 → `.up`으로 변경, 요약 바 "근처 · 추천" 띄어쓰기.
+- 미확인: Chrome 개발자도구 Sensors로 실제 위치 권한 허용/차단 수동 확인은 못 함(헤드리스에서 navigator.geolocation을 가짜로 바꿔 확인). Q2에서 확인 부탁.
+- 상단 바 시안 A(사용자 확정, 고운돋움은 되돌림): 🗺️ 삭제, Jua 21px "서울"(#ff6f8d) "여행친구"(#5a4632), 왼쪽 40px 랜드마크 배지(`brand.js` pickBadge·badgeSvg). 배지 = 응답 center에서 가장 가까운 6대 랜드마크(거리 제한 없음), center null이면 직전 배지, 처음엔 광화문(경복궁). 바뀔 때 Y축 뒤집기 0.4초, reduced-motion이면 바로. 새로고침 복원은 마지막 center로. 배지 그림 배치값은 `landmarks.js` BADGE_ART로 첫 화면 링과 공유.
+- 상단 토글 제거(2026-10-26, 사용자 요청): 상단 바의 "▾ 지도 접기/▴ 지도 펼치기" 버튼 삭제(로고만). 펼친 지도 바로 아래에 얇은 손잡이 `#handle` "▴ 지도 접기"(예전 토글 글자 모양 그대로: #c07a8a 14px, 배경 없음, 가로 전체·가운데). 누르면 접힘, 요약 바 "지도 보기 ▾"로 다시 펼침. 보임 규칙은 `view.js` placesView(has, mapOpen)로 빼서 테스트. 손잡이 `aria-expanded="true"`, 요약 바 `aria-expanded="false"`, 둘 다 `aria-controls="map"`; 키보드로 눌렀을 때만 포커스를 반대쪽 버튼으로 넘김(마우스 클릭 땐 포커스 테두리 안 생기게). 스크린샷 `scratchpad/shots/toggle-open.png`·`toggle-folded.png`(+`toggle-reopen`·`toggle-none`).
+- 첫 화면·새 대화(2026-10-26, 사용자 요청): 세션 ID를 `sessionStorage`로 옮김 → 같은 탭 새로고침은 복원, 새 탭·브라우저 재시작은 첫 화면. 예전 `localStorage`의 `stc.sessionId`는 시작할 때 지움. 저장·초기 상태는 `session.js`(loadSession·saveSession·clearSession·freshState, 테스트 6개)로 뺌. 결과 화면 상단 바 오른쪽 "↺ 새 대화"(`#newchat`, 예전 토글 글자 모양 #c07a8a 14px 그대로): 세션 ID·state 초기화, 대화·지도·칩·카드 비움, 배지 기본, 입력창·📍 대기 비움, 첫 화면 + 🎒 재시작. 응답 대기 중엔 disabled, 진행 중 복원은 세대 번호로 버림. 서버 기록은 안 지움. 확인(가짜 API 8013 + 헤드리스): 새로고침 복원 / 새 탭 첫 화면 / 같은 프로필로 브라우저 재시작 첫 화면 / 예전 localStorage 값 남겨도 첫 화면 / 새 대화 후 새로고침도 첫 화면 / 대기 중 버튼 비활성(CDP 실시간). 스크린샷 `scratchpad/shots/newchat-result.png`·`newchat-home.png`.
+- QA-8 후속(2026-10-26): center.source가 `gu`(구 전체)면 요약 바 제목에서 '근처'를 뺌("강서구 · 추천 5곳"). 이때 백엔드가 보내는 distance_m·walk_min null은 칩·카드가 이미 숨김(`hasWalk`=Number.isFinite) — 테스트로 확인.
+- 함정: 헤드리스 `--virtual-time-budget`은 네트워크 대기 중 가상 시간을 멈춰서 "응답 대기 중" 상태를 못 찍음 → `--remote-debugging-port` + node CDP 스크립트로 실시간 확인.
+- 참고: 명동(37.5636,126.9827)은 "가장 가까운" 규칙상 숭례문(0.8km)이 남산타워(1.4km)보다 가까워 숭례문 배지가 됨.
+- **함정: Node 24에서 `node --test tests/js`(디렉터리)는 MODULE_NOT_FOUND로 실패** → `node --test "tests/js/*.test.mjs"`로 실행해야 함(완료 조건 명령도 이걸로).
+- 함정: Windows에서 헤드리스 Chrome `--window-size=393,…`은 최소 폭(약 500px) 때문에 실제로는 393이 안 됨 → 393×852 iframe을 감싼 페이지를 찍어서 비교함.
 
 ### 팀원3 qa
--
+- 2026-10-23 시작. 브랜치 `feat/qa`(origin/feat/backend e633eee에서 분기). worktree 루트에 메인 `.env` 복사(커밋 안 함).
+- Q1 완료: `tests/api/`(가짜 의존성 56건: 계약·422·세션·멀티턴 "거기 근처"·places 교체·Review Focus 1~5·잘못된 좌표·지어낸 장소·기록 저장소 장애·history·health) + `tests/integration/test_live_api.py`(실서비스 8건, `test-qa-` 세션만 쓰고 끝나면 삭제). `pytest -m "not integration"` 129 통과, `pytest -m integration` 8 통과.
+- 버그 QA-1(팀원1, 850364d로 수정·재확인 완료): session_id 64자 초과 시 200인데 MySQL 저장이 조용히 실패 → 이제 65자 이상은 422.
+- 함정: Git Bash에서 `curl -d '{"message":"한글"}'`은 인코딩이 깨져 400 "There was an error parsing the body"가 남(서버 문제 아님) → 파이썬 requests나 UTF-8 파일 `--data-binary @파일`로 보낼 것. 포트 8001은 다른 프로세스(정적 http 서버)가 쓰는 중 → QA 서버는 8011. 8000은 사용자용 서버(끄지 말 것).
+- Q2 완료: `docs/manual-qa.md` 24개 항목 모두 통과(헤드리스 Chrome iPhone 14 Pro 393x852, 실서비스). 자동 점검 스크립트 `scripts/qa_mobile/run.mjs`(CDP, Node 24 내장 WebSocket): 8011 정상 / 8012 `OPENSEARCH_PORT=9299`(503) / 8013 `OLLAMA_URL=http://localhost:11999`(템플릿). `tests/integration/test_live_chat.py` 3건 추가. 스크린샷: `C:\Users\SMT03\AppData\Local\Temp\claude\C--Users-SMT03-SeoulTourChatbot\796dbd34-6ee3-48fe-b2a5-1247492df3b8\scratchpad\shots\01~14-*.png`.
+- 버그 QA-2(팀원1, bed8ebc): 기준점 없을 때 "근처/주변"·지어낸 동네 이름, 기준점 대신 이전 지역명 → 프롬프트 보강, 재확인 통과(LLM 문구라 완전 보장은 아님). QA-3(팀원2, ea2ea88): 넓은 범위 지도에서 랜드마크끼리·핀과 겹침 → 겹치는 랜드마크 생략, 재확인 통과.
+- 함정: 점검용 화면에서 만든 대화 기록은 UUID 세션이라 `test-qa-` 접두가 아님 → `results.json`의 `sessions`를 `delete_session()`으로 지움(완료).
+- B8·B9 검증(2026-10-26, feat/backend 9f38d69 병합): `tests/api/test_multiturn_api.py`(가짜 의존성 + 실제 카탈로그 22건: 세션1·2, 정보 질문 이름/거기+선택/거기+첫 장소/정보 없음/LLM 다운/대상 없음, "거기 근처 카페"·"3번 출구" 회귀, history place_info 형식, "다른 데 더" 소진) + `tests/integration/test_live_multiturn.py`(실서비스 7건, Ollama만 끈 앱 포함) + 화면 `scripts/qa_mobile/run_b89.mjs`(14항목 통과, manual-qa B8·B9 절). 단위 177·통합 27·JS 37 통과.
+- B9 반영해 기존 `test_tel_present_passes_through` 수정: 기준점이 된 장소는 결과에서 빠지므로 "가회동성당 근처" 대신 "종로 관광지"로 조회.
+- 버그 QA-4~7(팀원1에게 보냄): "아까 그 궁"→같은 분류 첫 장소, 범위 밖 순서("6번째")→재추천, 맥락 없는 "거기 어디야?"→아무 관광지 추천, "아까 그 식당"이 직전 목록만 봄(경미).
+- 함정: 지도 핀의 DOM 순서는 응답 순서와 다름(그리는 순서). "두 번째" 검증은 응답/기록 순서나 접힘 칩 순서로 할 것.
+- B8·B9 재확인(2026-10-26, feat/backend b101c72 병합): QA-4~7 수정 확인 통과. 테스트 보강 — `test_multiturn_api.py` 35건(QA-4 '궁'/'궁금', QA-5 6·여섯·10번째, QA-6, QA-7, 2글자 장소명 '기후', "다른 데 더" 먼 곳 안내 추가), `test_live_multiturn.py` 10건(B7 574/574로 고려삼계탕 주차 '가능'이 생겨 "정보 없음"은 각시보쌈으로 교체, 정보 있음 케이스 추가, QA-4·5·6 실서비스). 화면 `run_b89.mjs` 17항목 통과(8012). 단위 204·통합 30·JS 37 통과.
+- 함정: "종로 관광지" 실검색 상위 5곳엔 '궁'이 든 장소가 없음 → QA-4 실서비스 확인은 "종로 역사 관광지"로(테스트는 목록에서 '궁'이 든 첫 장소를 기대값으로 씀 — 51b8c0d 뒤 순서가 바뀌어 경희궁 흥화문).
+- 51b8c0d(구 전체·관광 세부 주제) 확인(2026-10-26): `test_multiturn_api.py` +9(강서구 산책/공원 1번이 주제 맞는 곳·구 밖 장소 없음·프롬프트에 거리 표시 없음, 구 '다른 데 더'에 1.5km 안내 없음, 금천구 산책 솔직 안내(템플릿·LLM 누락 시), 한강 근처 맛집=음식점, 주제 이어받기, '궁금'은 역사 주제 아님), `test_live_multiturn.py` +3(강서습지생태공원 1번, 금천구 안내, 한강 맛집), 화면 GU-1·2. 단위 227·통합 33·JS 37·화면 19 통과.
+- b689e90 회귀(2026-10-26): 단위 229·통합 33·JS 37·화면 B8·B9 19 + Q2 24 통과. `run.mjs`는 `QA_OK`/`QA_OS_DOWN`/`QA_LLM_DOWN` 환경 변수로 주소 지정 가능(이번엔 8012/8013/8014). test-qa- 세션 남은 것 0.
+- 2026-10-26 중단 시점(사용자 요청으로 종료): QA-8 리드 결정 ①(gu면 distance_m·walk_min null + 프론트 요약 바 "강서구 · 추천 5곳") 반영분은 **아직 병합·확인 안 함**. 확인 완료 기준은 feat/backend b689e90 + feat/frontend ea2ea88(feat/qa e6af8fb). 서버(8012~8014) 꺼짐, test-qa- 세션 0.
+- QA-8(팀원1→리드 결정 ① 확정, 백엔드 5bed7dc→2fee772(최종, d822a58 문서), 프론트 f413aea): 구 기준점일 때 거리·도보가 구 중심점 기준이라 카드 "강서구에서 약 40분"·요약 바 "강서구 근처"가 오해를 줌 → gu일 때 distance/walk null(④ 계약 변경) 또는 프론트에서 숨김 제안.
+- **QA-8 최종 확인(2026-10-27, feat/backend d822a58 + feat/frontend f413aea 병합, 충돌 없음):** 통과. 테스트 수정 — `assert_contract`(gu면 거리 null), `test_gu_wide_may_exceed_radius`(응답 거리 null이라 좌표로 1.5km 밖 확인), 구 '다른 데 더'·주제 이어받기에 source gu·거리 null 검사. 새 테스트 — 구 이어받은 턴('다른 데 더'·'맛집은?')·두 번 이어받기 gu, area/place/gps 거리 int, 명동 이어받기 history+int, 실서비스 2건. 화면 — `#toggle`→`#handle`, 세션 ID `sessionStorage`, B9-4 "강남구 · 추천", GU-1b·1c, `run.mjs` 8b(새 탭 첫 화면)·8c(↺ 새 대화). 결과: 단위 239+xfail 2·통합 35·JS 52·화면 B8·B9 21/21·Q2 25/26(11b LLM 문구, 회귀 아님).
+- **버그 QA-9(2026-10-27, 리드에게 보고):** 구 안에 맞는 곳이 0곳이면(카탈로그 카페 14곳뿐 → "강서구 카페 추천해줘", "강서구 공원" 뒤 "카페는?", 마포구도 같음) `recommend.py`가 구 분기를 지나 가장 가까운 곳 대체로 빠짐 → `source:"gu"`인데 `distance_m` 12838·`walk_min` 192(용산구·종로구 카페). 화면은 "🚶 강서구에서 약 192분"·칩 "192분"이 다시 보임(QA-8 이전 문제). 재현: `tests/api/test_multiturn_api.py::test_qa9_gu_with_no_match_still_no_distance`(xfail strict — 고치면 XPASS로 실패하니 xfail 표시를 지울 것).
+- **2b4a42a(괄호 장소 이름·되묻기 뒤 이어받기, backend-2) 확인(2026-10-27):** 통과. 새 `tests/api/test_alias_clarify_api.py` 32건(괄호 안·뺀 이름·영문 대소문자·직전 목록 지칭·기준점, 이름 아닌 괄호 말 '서울'·'실내'·'실외'·'…점'·'구 ○○', 2글자 별명 '공기', 남산/남산공원 회귀, 되묻기 이어받기·새 정보 우선·한 번만·기록 형식), `test_live_multiturn.py` +6, 화면 AL-1~3. 최종: 단위 294+xfail 2·통합 41(+환경 경합 1)·JS 52·화면 B8·B9 24/24·Q2 26/26.
+- **QA-9 수정 확인·최종 회귀(2026-10-27, feat/backend de019c1 병합, 충돌 없음):** 통과. xfail 2건 지우고 `test_multiturn_api.py`에 QA-9 7개(0곳 거리 null·구 밖 3곳, 0곳 안내(템플릿·LLM 누락), LLM이 다른 구를 말하면 안내 생략, 프롬프트 '(강서구 밖의 다른 구)', 금천구 맛집 1곳 채움 안내, '다른 데 더' 안내, 강남구 맛집 안내 없음), 실서비스 3건, 화면 QA-9(요약 바 "강서구 · 추천 3곳"·🚶/분 없음). 최종: 단위 309·통합 46·JS 52·화면 B8·B9 25/25·Q2 25/26(11b 알려진 한계). 남은 경미: LLM이 "강서구 근처에 카페 정보가 없어"처럼 '근처'를 씀, LLM 꺼짐 템플릿의 "금천구 근처 추천 장소…".
+- 함정: 통합 실행 중 `tests/test_history.py::test_keeps_latest_100[mysql]`가 한 번 17건으로 실패(단독 3회 통과) — 같은 MySQL을 쓰는 다른 세션이 `test-%` 세션을 지우면 생김. 통합은 다른 팀원 테스트와 겹치지 않게 돌릴 것.
+- 함정: 요약 바 `#fold` innerText는 flex라 "강서구\n· 추천 5곳"처럼 줄바꿈이 섞임 → 공백으로 바꿔 비교. 세션 ID는 74d76eb부터 `sessionStorage`(새 탭은 첫 화면).
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
@@ -152,3 +198,9 @@
 - 팀원1 (2026-10-27): 괄호 장소 이름("석파정"·"길상사") 인식 + 되묻기 뒤 이름만 답하면 앞 질문 이어받기 ✅(⑦ 참고) → qa-2에게 재확인 요청함.
 - 팀원1 (2026-10-26): B7 데이터 574/574 ✅, 개선 3개(2글자 장소명·"궁" 단어 경계·"다른 데 더" 먼 곳 안내) ✅, QA-4~7 수정 ✅(팀원3 재확인 대기), 구 기준점 전체 검색·관광 세부 주제(산책·역사·전시·쇼핑·체험·야경) ✅, QA-8(구 기준점 거리 null + 구를 이어받은 "다른 데 더"도 source "gu") ✅ 2fee772 — 리드가 다음 세션 할 일로 적은 "이어받은 구 source=gu"는 이미 반영됨(실화면 확인만 남음: 요약 바 "강서구 · 추천 5곳"). 2026-10-26 사용자 요청으로 여기서 중단. 남은 일: 팀원3 QA의 B8·B9 버그 리포트 대응. 남은 개선 후보: 3글자 장소명 오인(⑦ 참고).
 - 팀원1: B1~B6 완료(`feat/backend`). 남은 일은 팀원3(Q1·Q2) 버그 리포트 대응. Q1은 `tests/conftest.py`의 `small_catalog`·`FakeEmbedder`·`FakeSearcher`·`FakeLLM`과 `InMemoryHistoryRepo`로 `create_app(Deps(...))`를 만들면 됨(예: `tests/test_chat_service.py`).
+- 팀원3 (2026-10-27): QA-8 최종 확인 + 2b4a42a(괄호 이름·되묻기 이어받기) + QA-9(de019c1) 확인 끝(⑦ 참고). main 병합 준비 완료. 남은 일: 리드 병합 후 실제 휴대폰 위치 권한 팝업은 사람이 확인.
+- (완료) 팀원3 2026-10-26 중단 시점 할 일 — QA-8 확인:
+  1. worktree `agent-a3b7fc5a951212262`(feat/qa)에서 `git merge origin/feat/backend`(2fee772 이상) + `git merge origin/feat/frontend`(f413aea 이상). TEAM-STATUS 충돌은 양쪽 살리기.
+  2. 테스트 기대값 맞추기(QA-8 최종 규칙, ④ 참고): 기준점이 구면 places의 `distance_m`·`walk_min`이 null, 구 결과 뒤 "다른 데 더"·"카페는?"도 center.source=`gu`(이전엔 history). 고칠 곳 예상: `tests/api/test_multiturn_api.py`의 `test_gu_wide_may_exceed_radius`(distance>1500 검사 → null 검사로), `test_topic_carried_to_more`·`test_gu_wide_more_has_no_far_notice`(center.source gu 추가 검사), `tests/api/test_chat_api.py`의 `assert_contract`(center 있으면 거리 int라는 가정 → gu면 null 허용), `tests/integration/test_live_api.py::test_live_area_and_gu`. 새 테스트: gu 첫 턴·이어받은 턴 모두 거리 null, area/place/gps는 거리 int 유지, 명동(area) 이어받기는 source history.
+  3. 화면: `run_b89.mjs` GU-1 기대를 요약 바 "강서구 · 추천 5곳"('근처' 없음)·카드에 🚶 도보 줄 없음·칩에 분 없음으로 바꾸고, 8012로 `run_b89.mjs` + 8012/8013/8014로 `run.mjs`(QA_OK/QA_OS_DOWN/QA_LLM_DOWN) 재실행.
+  4. 단위·통합·JS·화면 전체 → manual-qa(QA-8 처리·GU 항목)·TEAM-STATUS 갱신 → 커밋·push → 리드에게 보고(리드가 그 결과로 main 병합). 리드 병합 후 실제 휴대폰 위치 권한 팝업만 사람이 한 번 확인 권장.
