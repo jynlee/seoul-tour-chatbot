@@ -230,3 +230,34 @@ def test_night_view_not_pushed_by_hangang_titles(fake_embedder):
     q = "한강 야경 볼 곳"
     rec = recommend(q, detect_intent(q), None, FakeSearcher(catalog), fake_embedder, catalog)
     assert rec.places[0].title == "반포대교 달빛무지개분수"
+
+
+def test_center_place_parts_excluded_within_1km(fake_embedder):
+    # QA-10: "창덕궁 근처 관광지" → 기준점 창덕궁(과 후원)의 세부 장소(다래나무 약 980m)는 빼고, 다른 장소만
+    places = [
+        _tour("p1", "창덕궁과 후원 [유네스코 세계유산]", "역사관광지", 37.5794, 126.9910, "종로구"),
+        _tour("p2", "창덕궁 다래나무", "자연관광지", 37.5882, 126.9910, "종로구"),  # 약 980m
+        _tour("p3", "창덕궁 인정문", "역사관광지", 37.5796, 126.9915, "종로구"),
+        _tour("p4", "종묘 [유네스코 세계유산]", "역사관광지", 37.5744, 126.9940, "종로구"),
+        _tour("p5", "창경궁", "역사관광지", 37.5788, 126.9948, "종로구"),
+        _tour("p6", "창덕궁 소극장", "문화시설", 37.6200, 126.9200, "은평구"),  # 멀리 떨어진 같은 앞말
+    ]
+    catalog = {p.id: p for p in places}
+    center = Center(lat=37.5794, lng=126.9910, label=places[0].title, source="place", place_id="p1")
+    rec = recommend("창덕궁 근처 관광지", detect_intent("창덕궁 근처 관광지"), center, FakeSearcher(catalog),
+                    fake_embedder, catalog, radius_m=10_000)
+    titles = [p.title for p in rec.places]
+    assert not any(t.startswith("창덕궁") and t != "창덕궁 소극장" for t in titles), titles
+    assert "종묘 [유네스코 세계유산]" in titles and "창경궁" in titles
+
+
+def test_center_place_group_keeps_restaurants_named_after_it(fake_embedder):
+    places = [
+        _tour("g1", "광화문", "역사관광지", 37.5760, 126.9768, "종로구"),
+        Place(id="f1", title="광화문 세종클럽", content_type="39", kind="food", category="이색음식점", cat3="A05020700",
+              addr="서울특별시 종로구", tel="", lat=37.5728, lng=126.9740, image="", gu="종로구"),
+    ]
+    catalog = {p.id: p for p in places}
+    center = Center(lat=37.5760, lng=126.9768, label="광화문", source="place", place_id="g1")
+    rec = recommend("광화문 근처 맛집", detect_intent("광화문 근처 맛집"), center, FakeSearcher(catalog), fake_embedder, catalog)
+    assert [p.title for p in rec.places] == ["광화문 세종클럽"]

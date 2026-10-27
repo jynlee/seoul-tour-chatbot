@@ -183,14 +183,22 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
 _WHOLE_SEOUL = re.compile(r"서울(?=$|[\s?!.,]|에서|에|의|은|는|을|이|가|도|전체|시내|안|곳곳)")
 # "카페는?"·"공원은?"처럼 말 하나에 '은/는'만 붙인 이어 묻기
 _SHORT_FOLLOW_UP = re.compile(r"^\s*[가-힣A-Za-z]{1,8}\s*(?:은|는)\s*[?？]?\s*$")
+# "그럼 산책할 곳은?"·"또 박물관은?" — 연결어 + 짧은 '○○은/는?' 이어 묻기 (리드 결정 QA-11)
+_CONNECTIVE_FOLLOW_UP = re.compile(r"^\s*(?:그럼|그러면|그리고|또)\s+[가-힣A-Za-z ]{1,12}?\s*(?:은|는)\s*[?？]?\s*$")
+# "이 근처 박물관도 있어?"·"주변에 야경 명소는?"·"이 동네 맛집" — 지금 보고 있는 곳 근처라는 말 (QA-11)
+_NEAR_HERE = ("근처", "주변", "인근", "가까운", "이 동네", "이동네", "여기", "이곳")
 
 
 def wants_whole_seoul(message: str) -> bool:
-    """직전 기준점을 이어받지 않고 서울 전체에서 찾을 새 질문: '서울'을 말했거나, 세부 주제(야경·산책·역사…)만
-    물은 새 추천 질문. "카페는?"·"다른 데 더"·"거기 근처…" 같은 이어 묻기는 아님 (사용자 결정 2026-10-27)."""
-    if is_more_request(message) or has_demonstrative(message) or _SHORT_FOLLOW_UP.match(message):
+    """직전 기준점을 이어받지 않고 서울 전체에서 찾을 새 질문: '서울'을 낱말로 말했거나, 연결어 없이 세부 주제
+    (야경·산책·역사…)만 물은 새 추천 질문 (사용자 결정 2026-10-27).
+    "카페는?"·"그럼 산책할 곳은?"·"다른 데 더"·"거기/이 근처…"·"주변에 ○○" 같은 이어 묻기는 아님 (QA-11)."""
+    if _WHOLE_SEOUL.search(message):
+        return True
+    if (is_more_request(message) or has_demonstrative(message) or _SHORT_FOLLOW_UP.match(message)
+            or _CONNECTIVE_FOLLOW_UP.match(message) or _has(message, _NEAR_HERE)):
         return False
-    return bool(_WHOLE_SEOUL.search(message)) or detect_intent(message).topic is not None  # 맛집·카페 질문은 주제 없음
+    return detect_intent(message).topic is not None  # 맛집·카페 질문은 주제 없음
 
 
 def ordinal_out_of_range(message: str, last_places: list[PlaceOut]) -> bool:

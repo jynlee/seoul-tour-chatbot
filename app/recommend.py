@@ -11,6 +11,8 @@ from app.schemas import PlaceOut
 CANDIDATES_K = 100
 MIN_PLACES = 3
 GROUP_RADIUS_M = 500
+# 기준점 장소의 세부 장소('창덕궁과 후원' 기준이면 '창덕궁 다래나무' 약 980m)는 더 넓게 뺀다 — 큰 궁·공원은 500m를 넘음
+CENTER_GROUP_RADIUS_M = 1000
 
 # 한 장소의 세부 장소('창덕궁 인정문'·'창덕궁 낙선재', '반포한강공원 달빛광장')는 제목 첫 단어가 같다 → 한 목록에 하나만.
 _BRACKETS = re.compile(r"[\(\[][^\)\]]*[\)\]]")
@@ -91,11 +93,17 @@ def recommend(message: str, intent: Intent, center: Center | None, searcher, emb
 
 def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m, exclude_ids) -> Recommendation:
     skip = set(exclude_ids)
+    center_place = catalog.get(center.place_id) if center is not None and getattr(center, "place_id", None) else None
     if center is not None and getattr(center, "place_id", None):
         skip.add(center.place_id)
+    center_key = group_key(center_place.title) if center_place is not None and center_place.kind != "food" else None
+
+    def part_of_center(p: Place) -> bool:  # 음식점('광화문 ○○식당')은 이름만 빌린 다른 가게라 세부 장소가 아님
+        return (center_key is not None and p.kind != "food" and group_key(p.title) == center_key
+                and haversine_m(center_place.lat, center_place.lng, p.lat, p.lng) <= CENTER_GROUP_RADIUS_M)
 
     def ok(p: Place) -> bool:
-        return p.id not in skip and has_coords(p) and _matches(p, intent)
+        return p.id not in skip and has_coords(p) and _matches(p, intent) and not part_of_center(p)
 
     vector = embedder.encode(message)
     hits = searcher.knn(vector, intent.content_types, intent.cat3, CANDIDATES_K)
