@@ -1,4 +1,5 @@
 """후보 검색 결과 → 최종 추천 장소. 장소 목록은 항상 카탈로그에서 만든다."""
+import re
 from dataclasses import dataclass, field
 
 from app.catalog import Place, has_coords
@@ -9,6 +10,36 @@ from app.schemas import PlaceOut
 
 CANDIDATES_K = 100
 MIN_PLACES = 3
+GROUP_RADIUS_M = 500
+
+# 한 장소의 세부 장소('창덕궁 인정문'·'창덕궁 낙선재', '반포한강공원 달빛광장')는 제목 첫 단어가 같다 → 한 목록에 하나만.
+_BRACKETS = re.compile(r"[\(\[][^\)\]]*[\)\]]")
+_COMMON_FIRST_WORDS = {"서울", "국립", "한국", "대한민국"}
+
+
+def group_key(title: str) -> str | None:
+    """세부 장소 묶음 이름: 괄호 뺀 제목의 첫 단어(끝의 '과/와'는 뗌). 흔한 앞말·한 글자는 None."""
+    words = _BRACKETS.sub(" ", title).split()
+    if not words:
+        return None
+    word = words[0]
+    if len(word) > 3 and word[-1] in "과와":
+        word = word[:-1]
+    return None if len(word) < 2 or word in _COMMON_FIRST_WORDS else word
+
+
+def one_per_group(places: list[Place], meters: float = GROUP_RADIUS_M) -> list[Place]:
+    """앞선 장소와 묶음 이름이 같고 meters 안이면 뺀다(순서 유지). 멀리 떨어진 같은 앞말(지점 등)은 남긴다."""
+    kept: list[Place] = []
+    by_key: dict[str, list[Place]] = {}
+    for p in places:
+        key = group_key(p.title)
+        if key and any(haversine_m(p.lat, p.lng, q.lat, q.lng) <= meters for q in by_key.get(key, [])):
+            continue
+        kept.append(p)
+        if key:
+            by_key.setdefault(key, []).append(p)
+    return kept
 
 
 @dataclass
@@ -82,6 +113,7 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
         return 1 if matches_topic(p.category, p.title, intent.topic) else 0
 
     candidates.sort(key=lambda p: -boost(p))  # 안정 정렬: 주제 맞는 곳 먼저, 그 안에서는 관련도순
+    candidates = one_per_group(candidates)
 
     if center is None:
         return Recommendation(places=[to_place_out(p) for p in candidates[:k]])
@@ -99,12 +131,13 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
         in_gu = [p for p in candidates if in_this_gu(p)]
         in_gu += [p for p in catalog.values() if in_this_gu(p) and p.id not in seen and ok(p)]
         in_gu.sort(key=lambda p: -boost(p))
+        in_gu = one_per_group(in_gu)
         chosen = in_gu[:k]
         if len(chosen) < MIN_PLACES:
             # 구 안이 0~2곳이면 같은 조건의 가장 가까운 다른 구 장소로 3곳까지 채운다
             ids = {p.id for p in chosen}
             extra = sorted((p for p in catalog.values() if p.id not in ids and ok(p)), key=dist)
-            chosen += extra[: MIN_PLACES - len(chosen)]
+            chosen = one_per_group(chosen + extra)[:MIN_PLACES]
         # 구 중심(평균 좌표)에서 잰 거리는 사용자에게 의미가 없어 distance_m·walk_min 은 null (QA-8, QA-9: 구 밖으로 채워도)
         return Recommendation(places=[to_place_out(p) for p in chosen], gu_wide=True, gu_empty=not in_gu,
                               place_gus={p.id: p.gu for p in chosen})
@@ -114,16 +147,13 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
         if len(within) < MIN_PLACES:
             # 반경 안이 1~2곳이면 같은 조건의 가장 가까운 곳으로 3곳까지 채운다 (거리·도보 시간은 그대로 보여줌)
             chosen = {p.id for p, _ in within}
-            extra = sorted(((p, dist(p)) for p in catalog.values()
-                            if p.id not in chosen and ok(p)),
-                           key=lambda x: x[1])
-            within += extra[: MIN_PLACES - len(within)]
+            extra = sorted((p for p in catalog.values() if p.id not in chosen and ok(p)), key=dist)
+            within = [(p, dist(p)) for p in one_per_group([p for p, _ in within] + extra)[:MIN_PLACES]]
         within.sort(key=lambda x: (-boost(x[0]), x[1]))  # 주제 맞는 곳 먼저, 그다음 가까운 순
         return Recommendation(places=[to_place_out(p, d) for p, d in within])
 
     # 반경 안에 하나도 없으면: 카탈로그 전체에서 같은 조건의 가장 가까운 3곳
-    nearest = sorted(((p, dist(p)) for p in catalog.values() if ok(p)),
-                     key=lambda x: x[1])[:MIN_PLACES]
+    nearest = [(p, dist(p)) for p in one_per_group(sorted((p for p in catalog.values() if ok(p)), key=dist))[:MIN_PLACES]]
     if not nearest:
         return Recommendation(places=[])
     first, d = nearest[0]

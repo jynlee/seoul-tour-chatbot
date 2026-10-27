@@ -108,13 +108,15 @@ def main(argv=None) -> int:
     items = load_raw_items(args.list)
     out = Path(args.out)
     state = load_state(out)
-    done = failed = 0
+    before = len(state["overview"])
+    failed = 0
     try:
-        done, failed = fetch_overviews(items, state, key, out, limit=args.limit, sleep=args.sleep)
+        _done, failed = fetch_overviews(items, state, key, out, limit=args.limit, sleep=args.sleep)
     except QuotaExceeded as e:
         print(f"일일 호출 한도 초과로 중단합니다. 내일 다시 실행하면 이어집니다. ({_scrub(e, key)})")
 
     ov = state["overview"]
+    done = len(ov) - before  # 한도 초과로 끊겨도 이번에 저장한 수
     left: dict[str, int] = {}
     for i in items:
         if str(i["contentid"]) not in ov:

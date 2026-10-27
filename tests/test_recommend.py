@@ -144,3 +144,50 @@ def test_gu_history_center_distance_null(fake_embedder):
     center = Center(lat=GANGSEO.lat, lng=GANGSEO.lng, label="강서구", source="history")
     rec = recommend("다른 데 더", detect_intent("관광지"), center, FakeSearcher(catalog), fake_embedder, catalog)
     assert rec.gu_wide and all(p.distance_m is None and p.walk_min is None for p in rec.places)
+
+
+# ---- 한 장소 안 세부 장소(창덕궁 인정문·낙선재 등)는 한 목록에 하나만 ----
+
+def test_group_key_palace_parts():
+    from app.recommend import group_key
+
+    assert group_key("창덕궁과 후원 [유네스코 세계유산]") == "창덕궁"
+    assert group_key("창덕궁 인정문") == "창덕궁"
+    assert group_key("창덕궁 낙선재") == "창덕궁"
+    assert group_key("반포한강공원 달빛광장") == group_key("반포한강공원") == "반포한강공원"
+    assert group_key("경복궁") == "경복궁"
+
+
+def test_group_key_ignores_common_prefix():
+    from app.recommend import group_key
+
+    assert group_key("서울 영휘원과 숭인원") is None
+    assert group_key("국립중앙박물관") == "국립중앙박물관"
+    assert group_key("국립 민속박물관") is None
+    assert group_key("갗") is None
+
+
+def test_one_per_group_keeps_far_apart():
+    from app.recommend import one_per_group
+
+    a = _tour("a", "창덕궁 인정문", "역사관광지", 37.5794, 126.9910, "종로구")
+    b = _tour("b", "창덕궁 낙선재", "역사관광지", 37.5790, 126.9935, "종로구")  # 약 230m
+    c = _tour("c", "창덕궁 소극장", "문화시설", 37.6200, 126.9200, "은평구")  # 멀리 떨어진 같은 앞말
+    d = _tour("d", "종묘", "역사관광지", 37.5744, 126.9940, "종로구")
+    assert [p.id for p in one_per_group([a, b, c, d])] == ["a", "c", "d"]
+
+
+def test_recommend_no_two_parts_of_same_palace(fake_embedder):
+    places = [
+        _tour("p1", "창덕궁과 후원 [유네스코 세계유산]", "역사관광지", 37.5794, 126.9910, "종로구"),
+        _tour("p2", "창덕궁 인정문", "역사관광지", 37.5796, 126.9915, "종로구"),
+        _tour("p3", "창덕궁 낙선재", "역사관광지", 37.5790, 126.9935, "종로구"),
+        _tour("p4", "종묘 [유네스코 세계유산]", "역사관광지", 37.5744, 126.9940, "종로구"),
+        _tour("p5", "창경궁", "역사관광지", 37.5788, 126.9948, "종로구"),
+    ]
+    catalog = {p.id: p for p in places}
+    center = Center(lat=37.5790, lng=126.9920, label="창덕궁", source="area")
+    rec = recommend("궁 추천", detect_intent("궁 추천"), center, FakeSearcher(catalog), fake_embedder, catalog)
+    titles = [p.title for p in rec.places]
+    assert sum(t.startswith("창덕궁") for t in titles) == 1, titles
+    assert "종묘 [유네스코 세계유산]" in titles and "창경궁" in titles
