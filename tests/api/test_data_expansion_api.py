@@ -138,3 +138,63 @@ def test_known_landmarks_still_found(new_catalog):
                            ("석파정 근처 맛집", "대원군별장(석파정)")]:
         p = match_place(message, new_catalog)
         assert p is not None and p.title == title, message
+
+
+# ---------------------------------------------------------------- 리드 결정(2026-10-27): 접속어 + 짧은 이어 묻기
+
+# '그럼/그러면/그리고/또' + 짧은 이어 묻기는 직전 기준점 유지(서울 전체 아님). 지금은 세부 주제가 있어 서울 전체로 감.
+@pytest.mark.xfail(strict=True, reason="리드 결정: '그럼/그러면/그리고/또' + 짧은 이어 묻기는 직전 기준점 유지 (app/dialog.py wants_whole_seoul)")
+@pytest.mark.parametrize("first, second, source, label", [
+    ("강서구 카페 추천해줘", "그럼 산책할 곳은?", "gu", "강서구"),
+    ("종로 관광지 추천해줘", "그러면 박물관은?", "gu", "종로구"),
+    ("명동 맛집 추천해줘", "그리고 야경 명소는?", "history", "명동"),
+    ("홍대 맛집 추천해줘", "또 공원 있어?", "history", "홍대"),
+])
+def test_connective_short_follow_up_keeps_center(new_catalog, first, second, source, label):
+    api = Api(new_catalog)
+    api.say(first)
+    r = api.say(second)
+    assert r["center"] and (r["center"]["source"], r["center"]["label"]) == (source, label)
+
+
+def test_connective_with_seoul_word_is_still_whole_seoul(new_catalog):
+    """'서울'을 낱말로 말하면 접속어가 있어도 서울 전체 (d976c2c 규칙 유지)."""
+    api = Api(new_catalog)
+    api.say("강서구 카페 추천해줘")
+    assert api.say("그럼 서울 야경 명소는?")["center"] is None
+
+
+# ---------------------------------------------------------------- 품질 메모 → 리드가 data에게 맡김 (재현)
+
+def _nearest(catalog, center, pred):
+    from app.catalog import has_coords
+
+    return min((p for p in catalog.values() if has_coords(p) and pred(p)),
+               key=lambda p: haversine_m(center["lat"], center["lng"], p.lat, p.lng))
+
+
+# ① 반경 기준(area/place)은 kNN 상위 100곳 중 반경 안 5곳 → 음식점이 1,586곳이 되자 아주 가까운 곳이 빠짐.
+#    가짜 검색(카탈로그 순서)으로도 같은 구조가 재현됨: 청계천 1.5km 안 음식점 91곳, 84m 더 우리곱창이 빠짐.
+@pytest.mark.xfail(strict=True, reason="품질 ①: 반경 안 가장 가까운 곳이 kNN 후보 밖이면 빠짐 (app/recommend.py _recommend, CANDIDATES_K)")
+def test_q1_nearest_food_in_radius_included(new_catalog):
+    r = Api(new_catalog).say("청계천 근처 맛집 추천해줘")
+    assert r["center"]["label"] == "청계천"
+    nearest = _nearest(new_catalog, r["center"], lambda p: p.kind == "food")
+    assert nearest.id in [p["id"] for p in r["places"]], nearest.title
+
+
+# ② 기준점 장소의 세부 장소('덕수궁 돈덕전' 0m, '반포한강공원 달빛광장')가 결과에 나옴
+@pytest.mark.xfail(strict=True, reason="품질 ②: 기준점 장소와 같은 묶음(세부 장소)이 결과에 나옴 (app/recommend.py one_per_group에 기준점 미포함)")
+# (가짜 검색 순서로는 '반포한강공원 근처'의 달빛광장이 안 뽑혀 재현 안 됨 → 실서비스 tests/integration/test_live_data_expansion.py)
+@pytest.mark.parametrize("message", ["덕수궁 근처 볼거리"])
+def test_q2_center_parts_excluded(new_catalog, message):
+    r = Api(new_catalog).say(message)
+    key = group_key(r["center"]["label"])
+    assert key and not [p["title"] for p in r["places"] if group_key(p["title"]) == key]
+
+
+# ③ 국립민속박물관이 '산업관광지'(신분류 매핑)
+@pytest.mark.xfail(strict=True, reason="품질 ③: 국립민속박물관 분류가 산업관광지 (app/catalog.py effective_codes 신분류 매핑)")
+def test_q3_folk_museum_is_culture(new_catalog):
+    p = next(p for p in new_catalog.values() if p.title.startswith("국립민속박물관"))
+    assert p.category == "문화시설"

@@ -196,6 +196,7 @@
 - **버그 QA-10(리드에게 보고):** '창덕궁과 후원 [유네스코 세계유산]'·'서울 운현궁'·'서울 효창공원'·'서울 명동성당'처럼 붙은 제목('서울 ' 55곳, '○○과 ○○' 4곳)을 부르는 이름으로 못 찾음 → "창덕궁 주차돼?"·"운현궁 입장료" 되묻기, "효창공원 근처 맛집" 기준점 없음. `app/center.py::title_aliases`. 재현 `test_qa10_*`(xfail strict 6).
 - **버그 QA-11(리드에게 보고, d976c2c 회귀):** '이 근처'·'근처에'·'주변에' + 세부 주제 이어 묻기("이 근처 박물관도 있어?")가 지시어로 안 잡혀 `wants_whole_seoul` → 서울 전체. `app/dialog.py`. 재현 `test_qa11_*`(xfail strict 3). 고쳐지면 XPASS로 실패하니 xfail 표시를 지울 것.
 - 화면 스크립트 낡은 기대값 수정: run_b89 QA-4(궁 목록 질문), GU-1(1번 공원+5곳 안 습지), QA-9(강서구 → 양천구), GU-2(금천구 산책 → 야경), DX-1·2 추가 / run.mjs 6(핀 DOM 순서 대신 첫 칩 이름).
+- 재현 테스트 추가(리드 지시, data가 수정 담당): 리드 결정 '그럼/그러면/그리고/또 + 짧은 이어 묻기는 직전 기준점 유지' `test_connective_short_follow_up_keeps_center`(xfail 4, '그럼 서울 야경 명소는?'은 서울 전체 유지 — 통과), 품질 ①·②·③ 단위 `test_q1_*`·`test_q2_*`·`test_q3_*`(xfail 3), 실서비스 `tests/integration/test_live_data_expansion.py`(xfail 5: 청계천 가장 가까운 음식점, 남산서울타워, 덕수궁·반포한강공원 세부 장소 제외, 창덕궁 세부 장소 하나). 단위 388+xfail 16.
 - 함정: area/place 기준 추천은 kNN 상위 100곳 중 반경 안 → 음식점 1,586곳이 되자 아주 가까운 곳이 빠짐("청계천 근처 맛집" 84m 음식점은 kNN 261위, 1번은 890m 카페). 규칙대로라 버그로 안 올림, 품질 메모로 보고.
 
 ### 팀원4 data (`feat/data`, worktree `.claude/worktrees/data`)
