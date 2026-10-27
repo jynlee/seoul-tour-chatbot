@@ -98,6 +98,7 @@ class Place:
     # 관광공사 상세 정보 (scripts/enrich_detail.py): parking, hours, rest_day, menu, fee, reservation, pet, stroller,
     # contact, period, place, season, discount, age, packing 중 있는 것만
     detail: dict = field(default_factory=dict, compare=False, hash=False)
+    overview: str = field(default="", compare=False, hash=False)  # 관광공사 개요 (scripts/fetch_overview.py)
 
 
 def category_name(item: dict) -> str:
@@ -140,7 +141,7 @@ def _float(v) -> float:
         return 0.0
 
 
-def place_from_item(item: dict, tel: str = "", detail: dict | None = None) -> Place:
+def place_from_item(item: dict, tel: str = "", detail: dict | None = None, overview: str = "") -> Place:
     addr = f"{item.get('addr1', '')} {item.get('addr2', '')}".strip()
     content_type = str(item.get("contenttypeid", ""))
     return Place(
@@ -157,6 +158,7 @@ def place_from_item(item: dict, tel: str = "", detail: dict | None = None) -> Pl
         image=item.get("firstimage", "") or "",
         gu=_gu_of(item.get("addr1", "")),
         detail=dict(detail or {}),
+        overview=overview or "",
     )
 
 
@@ -178,6 +180,7 @@ def load_catalog(raw_path="data/seoul_tour.json", enriched_path="data/seoul_tour
     catalog: dict[str, Place] = {}
     for item in load_raw_items(raw_path):
         extra = enriched.get(str(item["contentid"]), {})
-        place = place_from_item(item, tel=extra.get("tel", ""), detail=extra.get("detail"))
+        place = place_from_item(item, tel=extra.get("tel", ""), detail=extra.get("detail"),
+                                overview=extra.get("overview", ""))
         catalog[place.id] = place
     return catalog
