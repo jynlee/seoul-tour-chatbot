@@ -210,6 +210,7 @@
   - `app/search.py`: 임베딩 문장 뒤에 개요 앞 150자(`OVERVIEW_CHARS`, 기존 문장 약 32토큰 + 128토큰 한도). 쓰기 보호(`index_name_guard(write=True)`)에 `seoul-tour-v2`·`food-materials`. 설정·`.env.example` 기본 인덱스 `seoul-tour-v3`(3,444건 색인, 1분 23초). **worktree `.env`는 v2 그대로 → 실행 시 `OPENSEARCH_INDEX=seoul-tour-v3`**.
   - 테스트: 특정 장소·"강서구 카페 없음" 같은 574곳 시나리오 단위 테스트 31개는 `tests/fixtures/seoul_tour_574.json`(`tests.conftest.CATALOG_574`)로 고정(새 코드가 574곳 데이터로 전부 통과함을 확인). 새 데이터는 `test_new_data_*`. 통합 테스트 7개 기대값을 새 사실로(QA-9 → 양천구 카페 0곳·노원구 1곳, 주제 없음 → 금천구 야경, 강서구 공원 5곳 안에 습지공원).
   - 추천 대상(좌표 있는 곳) 3,435/3,444곳.
+- 2026-10-27 사용자 버그 수정(cec714b, main 574곳 코드에도 있던 버그): "그 근처 카페는?"이 앞선 목록의 '한국의집 사랑(아트샵&카페)'을 기준점으로 잡음. 원인 `dialog.resolve_reference` 3단계 — "그 근처"의 '그 '가 REF_MARKERS에 걸리고, '카페'가 제목 부분 문자열로 맞음. 수정: 지시어(그 근처·그 주변·거기·그 집) 속 '그 '는 지칭 표시로 안 봄 + 분류 일반어(카페·식당·맛집·공원 등)만 겹친 부분은 이름 일치로 안 침. 574 고정 재현 `test_demonstrative_near_after_earlier_list_with_generic_title`.
 
 ## ⑧ 다음에 이어서 할 일
 - 팀원4 (2026-10-27): 데이터 확장 2단계 반영·v3 색인 ✅(⑦ 참고). **남은 일 = 개요·상세 나머지 받기**(한도 각 1,000건/일): 매일 `python scripts/fetch_overview.py`(남은 2,454건, 문화 352·음식 1,586·레포츠 125·축제 188·쇼핑 199 → 약 3일)와 `python scripts/enrich_detail.py --raw data/raw/seoul_merged.json --out data/raw/detail.json --skip-from data/seoul_tour_enriched.json`(남은 1,959건 → 약 2일). 받은 뒤 `python scripts/apply_merged.py` → (개요가 늘었으면) `OPENSEARCH_INDEX=seoul-tour-v3 python scripts/build_index.py` → 커밋. 상세만 늘었으면 재색인 불필요.
