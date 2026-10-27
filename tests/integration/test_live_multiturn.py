@@ -239,3 +239,44 @@ def test_live_topic_missing_and_hangang_food(live):
     assert any(w in r["answer"] for w in ("없", "못 찾", "어려", "아쉽")), r["answer"]  # 솔직히 안내
     r = Talk(client, sessions).say("한강 근처 맛집")
     assert r["places"] and all(p["kind"] == "food" for p in r["places"])
+
+
+# ---------------------------------------------------------------- 2b4a42a: 괄호 이름·되묻기 뒤 이어받기 (실서비스)
+
+def test_live_alias_clarify_explain_with_llm(live):
+    """'거기 어디야?' → 되묻기 → '길상사' → 길상사(서울) 설명 (실제 Ollama·상세 정보)."""
+    client, _, _, sessions = live
+    t = Talk(client, sessions)
+    assert t.say("거기 어디야?")["answer"] == CLARIFY_ANSWER
+    r = t.say("길상사")
+    assert_place_info(t, r, "길상사(서울)")
+    assert "길상사" in r["answer"], r["answer"]
+
+
+def test_live_alias_clarify_field_llm_down(live):
+    """Ollama 꺼짐: '주차 가능해?' → 되묻기 → '세계태권도본부' → 국기원(세계태권도본부) 템플릿 답에 주차."""
+    _, down, _, sessions = live
+    t = Talk(down, sessions)
+    assert t.say("주차 가능해?")["answer"] == CLARIFY_ANSWER
+    r = t.say("세계태권도본부")
+    assert_place_info(t, r, "국기원(세계태권도본부)")
+    assert r["answer"].startswith("국기원(세계태권도본부) — 주차"), r["answer"]
+
+
+@pytest.mark.parametrize("message, source, label", [
+    ("남산 맛집", "area", "남산"),
+    ("남산공원 근처 카페", "place", "남산공원(서울)"),
+    ("kspo dome 근처 맛집", "place", "올림픽체조경기장(KSPO DOME)"),
+])
+def test_live_alias_center(live, message, source, label):
+    client, _, _, sessions = live
+    r = Talk(client, sessions).say(message)
+    assert r["center"]["source"] == source and r["center"]["label"] == label, r["center"]
+    assert r["places"]
+
+
+def test_live_alias_not_names(live):
+    client, _, _, sessions = live
+    for message in ["서울 관광지 추천해줘", "실내 관광지 추천해줘", "공기 좋은 산책 코스 추천해줘"]:
+        r = Talk(client, sessions).say(message)
+        assert r["center"] is None or r["center"]["source"] != "place", (message, r["center"])

@@ -225,6 +225,31 @@ try {
   check('GU-2', '"금천구 산책할 곳" → 맞는 곳이 없다고 솔직히 안내 + 핀', /없|못 찾|어려|아쉽/.test(wb2.text) && (await pins(w)).length > 0, wb2.text);
   await w.close();
 
+  // ---------------- 2b4a42a: 괄호 이름·되묻기 뒤 이어받기
+  const a = await freshPage(ctx);
+  await send(a, '종로 관광지 추천해줘');
+  const a1 = await pins(a);
+  const ab = await send(a, '석파정 무료 입장이야?');
+  const aRec = await lastBotRecord(a);
+  await a.shot(`${SHOTS}/b89-14-alias-info.png`);
+  check('AL-1', '"석파정 무료 입장이야?" → 대원군별장(석파정) 설명, 핀 그대로', aRec.center?.label === '대원군별장(석파정)' && ids(await pins(a)) === ids(a1) && ab.cls === 'bub b',
+    `기록 center=${aRec.center?.label} / ${ab.text}`);
+  const ab2 = await send(a, '남산공원 근처 카페');
+  const foldA = await foldText(a);
+  await a.shot(`${SHOTS}/b89-15-alias-center.png`);
+  check('AL-2', '"남산공원 근처 카페" → 요약 바 "남산공원(서울) 근처", ☕ 핀', foldA.includes('남산공원(서울) 근처') && (await pins(a)).every((x) => x.emoji.includes('☕')),
+    `${foldA} / ${ab2.text.slice(0, 80)}`);
+  await a.close();
+
+  const cl = await freshPage(ctx);
+  const cl1 = await send(cl, '무료 입장이야?');
+  const cl2 = await send(cl, '대원군별장');
+  const clRec = await lastBotRecord(cl);
+  await cl.shot(`${SHOTS}/b89-16-clarify-carry.png`);
+  check('AL-3', '"무료 입장이야?" → 되묻기 → "대원군별장" → 요금 답, 핀 없음(첫 화면 지도 없음)', cl1.text.includes('어느 곳을 말씀하시는지') && clRec.center?.label === '대원군별장(석파정)'
+    && cl2.text.includes('요금') && (await pins(cl)).length === 0, `${cl2.text}`);
+  await cl.close();
+
   // ---------------- 대상 없음 → 되묻기
   const c = await freshPage(ctx);
   const cb = await send(c, '주차 가능해?');
