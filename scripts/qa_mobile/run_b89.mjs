@@ -174,7 +174,7 @@ try {
 
   // ---------------- QA-4·QA-5 재확인
   const k = await freshPage(ctx);
-  await send(k, '종로 역사 관광지');
+  await send(k, '종로 근처 궁이나 박물관');  // 데이터 확장 뒤 '종로 역사 관광지'는 박물관이 앞서 '궁'이 안 나올 때가 있음
   const ka = await apiPlaces(k);
   const kp = await pins(k);
   const palace = ka.find((x) => x.title.includes('궁'));
@@ -203,7 +203,9 @@ try {
   await sleep(300);
   const wcard = await w.eval(`document.querySelector('#card').innerText`);
   await w.shot(`${SHOTS}/b89-12-gu-park.png`);
-  check('GU-1', '"강서구 공원 추천해줘" → 강서구 기준, 1번 칩·핀이 강서습지생태공원', wa[0]?.title === '강서습지생태공원' && wchips[0]?.includes('강서습지생태공원'),
+  // 데이터 확장 뒤 강서구 공원이 늘어 1번은 바뀔 수 있음('꿩고개공원' 등) → 1번이 공원이고 칩 순서 = 응답 순서, 5곳 안에 강서습지생태공원
+  check('GU-1', '"강서구 공원 추천해줘" → 강서구 기준, 1번이 공원, 5곳 안에 강서습지생태공원', /공원/.test(wa[0]?.title) && wchips[0]?.includes(wa[0].title)
+    && wa.some((x) => x.title === '강서습지생태공원'),
     `${wchips.join(' | ')} / ${wb.text}`);
   // QA-8 최종: 구 기준이면 요약 바 "강서구 · 추천 N곳"('근처' 없음), 카드에 🚶 도보 줄 없음, 칩에 '분' 없음
   check('GU-1b', 'QA-8: 요약 바 "강서구 · 추천 N곳"(근처 없음)·카드 도보 줄 없음·칩에 분 없음',
@@ -220,7 +222,9 @@ try {
     foldW2.includes(`강서구 · 추천 ${wa2.length}곳`) && !foldW2.includes('근처') && wchips2.every((c) => !/\d+분/.test(c))
     && wa2.every((x) => x.distance_m === null),
     `${foldW2.replace(/\n/g, ' ')} / ${wchips2.join(' | ')}`);
-  // QA-9: 구 안에 카페 0곳 → 다른 구 카페, 화면에 🚶·분 없음, 요약 바 "강서구 · 추천 N곳", 답에 다른 구 안내
+  // QA-9: 구 안에 카페 0곳 → 다른 구 카페, 화면에 🚶·분 없음, 요약 바 "양천구 · 추천 N곳", 답에 다른 구 안내
+  // (데이터 확장 뒤 강서구 카페가 생겨 카페 0곳인 양천구로 바꿈)
+  await send(w, '양천구 공원 추천해줘');
   const wq = await send(w, '카페는?');
   const wqa = await apiPlaces(w);
   const wqchips = await chipTitles(w);
@@ -229,13 +233,13 @@ try {
   await sleep(300);
   const wqcard = await w.eval(`document.querySelector('#card').innerText`);
   await w.shot(`${SHOTS}/b89-17-qa9-gu-empty.png`);
-  check('QA-9', '"강서구 공원" 뒤 "카페는?" → 다른 구 카페, 요약 바 "강서구 · 추천 N곳", 카드·칩에 도보/분 없음, 다른 구 안내',
-    wqfold.includes(`강서구 · 추천 ${wqa.length}곳`) && !wqcard.includes('🚶') && wqchips.every((c) => !/\d+분/.test(c))
-    && wqa.every((x) => x.distance_m === null && x.walk_min === null) && /다른 구|용산구|종로구/.test(wq.text),
+  check('QA-9', '"양천구 공원" 뒤 "카페는?" → 다른 구 카페, 요약 바 "양천구 · 추천 N곳", 카드·칩에 도보/분 없음, 다른 구 안내',
+    wqfold.includes(`양천구 · 추천 ${wqa.length}곳`) && !wqcard.includes('🚶') && wqchips.every((c) => !/\d+분/.test(c))
+    && wqa.every((x) => x.distance_m === null && x.walk_min === null) && /다른 구|영등포구|강서구|구로구/.test(wq.text),
     `${wqfold} / ${wqchips.join(' | ')} / 카드: ${wqcard.replace(/\n/g, ' / ')} / ${wq.text}`);
-  const wb2 = await send(w, '금천구 산책할 곳');
+  const wb2 = await send(w, '금천구 야경 볼 곳');  // 데이터 확장 뒤 금천구에도 공원이 생겨 산책 대신 야경(0곳)
   await w.shot(`${SHOTS}/b89-13-topic-missing.png`);
-  check('GU-2', '"금천구 산책할 곳" → 맞는 곳이 없다고 솔직히 안내 + 핀', /없|못 찾|어려|아쉽/.test(wb2.text) && (await pins(w)).length > 0, wb2.text);
+  check('GU-2', '"금천구 야경 볼 곳" → 맞는 곳이 없다고 솔직히 안내 + 핀', /없|못 찾|어려|아쉽/.test(wb2.text) && (await pins(w)).length > 0, wb2.text);
   await w.close();
 
   // ---------------- 2b4a42a: 괄호 이름·되묻기 뒤 이어받기
@@ -262,6 +266,22 @@ try {
   check('AL-3', '"무료 입장이야?" → 되묻기 → "대원군별장" → 요금 답, 핀 없음(첫 화면 지도 없음)', cl1.text.includes('어느 곳을 말씀하시는지') && clRec.center?.label === '대원군별장(석파정)'
     && cl2.text.includes('요금') && (await pins(cl)).length === 0, `${cl2.text}`);
   await cl.close();
+
+  // ---------------- 데이터 확장(seoul-tour-v3): 사용자 실제 대화 끝부분
+  const d = await freshPage(ctx);
+  await send(d, '종로 관광지 추천해줘');
+  await send(d, '서울에서 데이트 코스 추천해줘');
+  const dFold = await foldText(d);
+  check('DX-1', '"서울에서 데이트 코스" → 직전 종로구를 이어받지 않음(요약 바에 종로구 없음)', !dFold.includes('종로구') && (await pins(d)).length > 0, dFold);
+  await send(d, '강서구에 산책할만한 곳 추천해줘');
+  const da = await apiPlaces(d);
+  const db = await send(d, '그 근처 카페는?');
+  const dFold2 = await foldText(d);
+  const dp = await pins(d);
+  await d.shot(`${SHOTS}/b89-18-near-cafe-after-gu.png`);
+  check('DX-2', '구 목록 뒤 "그 근처 카페는?" → 1번 장소 근처 ☕ (아트샵&카페 같은 제목을 기준점으로 안 잡음)',
+    dFold2.includes(`${da[0].title} 근처`) && dp.length > 0 && dp.every((x) => x.emoji.includes('☕')), `${dFold2} / ${db.text.slice(0, 80)}`);
+  await d.close();
 
   // ---------------- 대상 없음 → 되묻기
   const c = await freshPage(ctx);
