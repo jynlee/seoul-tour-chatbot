@@ -355,3 +355,16 @@ def test_gu_with_enough_places_has_no_notice(real_catalog):
     _assert_gu_no_distance(r, "강남구")
     assert all(real_catalog[p.id].gu == "강남구" for p in r.places)
     assert r.answer == "가짜 답변이에요."
+
+
+def test_demonstrative_near_after_earlier_list_with_generic_title(real_catalog):
+    # 사용자 버그(2026-10-27): 앞선 목록에 제목에 '카페'가 든 곳(도자기카페 줄)이 있으면 "그 근처 카페는?"이
+    # 직전 첫 추천이 아니라 그곳을 기준점으로 잡던 문제
+    s = Session(real_catalog)
+    r1 = s.say("마포구 쇼핑 추천해줘")
+    assert "도자기카페 줄" in _titles(r1)  # 전제: 앞선 목록에 제목에 '카페'가 든 곳
+    r2 = s.say("강서구 공원 추천해줘")
+    first = r2.places[0]
+    r3 = s.say("그 근처 카페는?")
+    assert r3.center.label == first.title and r3.center.source == "place", (r3.center, first.title)
+    assert r3.places and all(real_catalog[p.id].cat3 == CAFE for p in r3.places)

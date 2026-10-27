@@ -56,6 +56,9 @@ _CATEGORY_WORDS = {
     "궁": "역사관광지", "쇼핑": "쇼핑", "시장": "쇼핑", "축제": "축제", "공연": "공연/행사",
 }
 _KIND_WORDS = {"식당": "food", "맛집": "food", "음식점": "food", "밥집": "food", "관광지": "tour", "명소": "tour"}
+# 분류 일반어('카페'·'식당'·'공원'…)만 겹친 제목은 이름 일부 일치로 치지 않는다 ('…(아트샵&카페)'가 "카페는?"에 걸리던 문제).
+# "아까 그 카페"는 위 분류 일치 규칙으로 따로 찾는다.
+_GENERIC_WORDS = tuple(w for w in (*_CATEGORY_WORDS, *_KIND_WORDS) if len(w) >= 2)
 
 
 def _has(message: str, words) -> bool:
@@ -104,7 +107,7 @@ def _longest_title_substring(title: str, message: str) -> int:
             sub = compact[i:j]
             if j - i <= best:
                 break
-            if sub in message and not any(sub in s for s in _STOP_SUBSTRINGS):
+            if sub in message and not any(sub in s for s in _STOP_SUBSTRINGS + _GENERIC_WORDS):
                 best = j - i
                 break
     return best
@@ -153,8 +156,11 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
     if named is not None:
         return Reference(named, "title")
 
-    # 3) "아까 그 카페", "그 삼계탕집"
-    if _has(message, REF_MARKERS):
+    # 3) "아까 그 카페", "그 삼계탕집" — "그 근처/그 주변/그 집"의 '그 '는 지칭 표시로 보지 않음(4단계 지시어 우선)
+    marked = message
+    for d in REF_DEMONSTRATIVES:
+        marked = marked.replace(d, " ")
+    if _has(marked, REF_MARKERS):
         for places in ([last_places] if last_places else []) + list(earlier_lists):
             ref = from_out(_partial_match(message, places, use_category=not near), "partial")
             if ref is not None:

@@ -101,3 +101,30 @@ def test_partial_reference_searches_earlier_lists(small_catalog):
     r = resolve_reference("아까 그 식당 몇 시에 열어?", None, last, None, small_catalog, earlier_lists=earlier)
     assert r.place.title == "개성만두 궁"
     assert resolve_reference("아까 그 식당 몇 시에 열어?", None, last, None, small_catalog) is None
+
+
+def _with_title_place(small_catalog, pid, title):
+    import dataclasses
+
+    p = dataclasses.replace(small_catalog["2733967"], id=pid, title=title, category="쇼핑", content_type="38")
+    small_catalog[pid] = p
+    return to_place_out(p)
+
+
+def test_demonstrative_near_beats_generic_word_in_earlier_title(small_catalog):
+    # 사용자 버그: "그 근처 카페는?" → 앞선 목록의 '한국의집 사랑(아트샵&카페)'(제목에 '카페')를 고르던 문제
+    shop = _with_title_place(small_catalog, "x1", "한국의집 사랑(아트샵&카페)")
+    last = _last(small_catalog, "126512", "775394")
+    for msg in ("그 근처 카페는?", "그 주변 카페 있어?", "거기 근처 식당 알려줘"):
+        r = resolve_reference(msg, None, last, None, small_catalog, near=True, earlier_lists=[[shop]])
+        assert r is not None and r.kind == "demonstrative" and r.place.id == "126512", msg
+
+
+def test_generic_word_alone_is_not_a_title_match(small_catalog):
+    # '카페'·'식당' 같은 분류 일반어만 겹친 제목은 이름 일부 일치로 치지 않음 (분류 일치 규칙은 그대로)
+    shop = _with_title_place(small_catalog, "x1", "도자기카페 줄")
+    assert resolve_reference("아까 그 카페", None, [shop], None, small_catalog, near=True) is None
+    r = resolve_reference("아까 그 도자기카페 주차돼?", None, [shop], None, small_catalog)
+    assert r.place.id == "x1"
+    cafe = _last(small_catalog, "2622715")  # 감꽃당(카페 분류)
+    assert resolve_reference("아까 그 카페 몇 시에 열어?", None, cafe, None, small_catalog).place.title == "감꽃당"
