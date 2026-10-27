@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.catalog import CAFE_CAT3, load_catalog
 from app.chat import Deps
+from app.geo import haversine_m
 from app.history import InMemoryHistoryRepo
 from app.intent import matches_topic
 from app.llm import CLARIFY_ANSWER, FAR_MORE_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE
@@ -418,18 +419,98 @@ def test_gu_wide_nature_topic_first(real_catalog, message):
     assert "강서구 안에서 고른 곳" in prompt
 
 
+def assert_gu_no_distance(body, gu):
+    """QA-8 최종: 기준점이 구(첫 턴이든 이어받은 턴이든)면 source=gu, 거리·도보 null."""
+    assert body["center"]["source"] == "gu" and body["center"]["label"] == gu, body["center"]
+    assert body["places"], body["answer"]
+    for p in body["places"]:
+        assert p["distance_m"] is None and p["walk_min"] is None, p
+
+
+def far_from_center(body):
+    c = body["center"]
+    return any(haversine_m(c["lat"], c["lng"], p["lat"], p["lng"]) > 1500 for p in body["places"])
+
+
 def test_gu_wide_may_exceed_radius(real_catalog):
+    """구 전체에서 고르므로 구 중심에서 1.5km 넘는 곳도 나옴(응답의 거리는 null이라 좌표로 직접 잼)."""
     api = Api(real_catalog)
     r = api.say("종로 관광지")
     assert gu_of(real_catalog, r) == {"종로구"}
-    others = Api(real_catalog)
-    seen = set(ids(r))
-    far_seen = any(p["distance_m"] > 1500 for p in r["places"])
+    assert_gu_no_distance(r, "종로구")
+    far_seen = far_from_center(r)
     for _ in range(3):  # 구 전체라 '다른 데 더'를 해도 같은 구 안에서 계속 나옴
-        r = others.say("종로 관광지") if others.sid is None else others.say("다른 데 더 추천해줘")
+        r = api.say("다른 데 더 추천해줘")
+        if not r["places"]:
+            break
         assert gu_of(real_catalog, r) <= {"종로구"}
-        far_seen = far_seen or any(p["distance_m"] > 1500 for p in r["places"])
+        assert_gu_no_distance(r, "종로구")
+        far_seen = far_seen or far_from_center(r)
     assert far_seen
+
+
+@pytest.mark.parametrize("follow", ["다른 데 더 추천해줘", "맛집은?"])
+def test_gu_carried_turn_is_gu_without_distance(real_catalog, follow):
+    """QA-8(2fee772): 구 결과 뒤 이어받은 턴도 center.source=gu, 거리·도보 null (예전엔 history + 거리)."""
+    api = Api(real_catalog)
+    assert_gu_no_distance(api.say("강서구 공원 추천해줘"), "강서구")
+    r = api.say(follow)
+    assert_gu_no_distance(r, "강서구")
+    assert gu_of(real_catalog, r) == {"강서구"}
+
+
+def test_gu_carried_twice_stays_gu(real_catalog):
+    """두 번 이어받아도(구 관광지 → 맛집은? → 다른 데 더) 계속 gu."""
+    api = Api(real_catalog)
+    api.say("마포구 관광지 추천해줘")
+    assert_gu_no_distance(api.say("맛집은?"), "마포구")
+    assert_gu_no_distance(api.say("다른 데 더 추천해줘"), "마포구")
+
+
+@pytest.mark.xfail(strict=True, reason="QA-9: 구 안에 맞는 곳이 0이면 가장 가까운 곳 대체로 빠져 source=gu인데 거리 int")
+@pytest.mark.parametrize("turns", [["강서구 카페 추천해줘"], ["강서구 공원 추천해줘", "카페는?"]])
+def test_qa9_gu_with_no_match_still_no_distance(real_catalog, turns):
+    """강서구엔 카페가 0곳(카탈로그 카페 14곳) → 지금은 용산구 카페가 12838m·192분으로 나옴.
+    프론트는 walk_min이 숫자면 '🚶 강서구에서 약 192분'·칩 '192분'을 그려 QA-8 이전 문제가 그대로 보임."""
+    api = Api(real_catalog)
+    for t in turns:
+        r = api.say(t)
+    assert_gu_no_distance(r, "강서구")
+
+
+@pytest.mark.parametrize("message, source", [
+    ("명동 맛집 추천해줘", "area"),
+    ("광화문 근처 맛집 추천해줘", "place"),
+])
+def test_non_gu_keeps_int_distance(real_catalog, message, source):
+    """area/place 기준점은 거리·도보 int 그대로(QA-8은 gu만 바꿈)."""
+    api = Api(real_catalog)
+    r = api.say(message)
+    assert r["center"]["source"] == source
+    assert r["places"]
+    for p in r["places"]:
+        assert isinstance(p["distance_m"], int) and isinstance(p["walk_min"], int), p
+
+
+def test_gps_keeps_int_distance(real_catalog):
+    api = Api(real_catalog)
+    r = api.say("근처 맛집 추천해줘", location={"lat": 37.5665, "lng": 126.9780})
+    assert r["center"]["source"] == "gps"
+    assert r["places"]
+    for p in r["places"]:
+        assert isinstance(p["distance_m"], int) and isinstance(p["walk_min"], int), p
+
+
+@pytest.mark.parametrize("follow", ["카페는?", "다른 데 더 추천해줘"])
+def test_area_carried_turn_is_history_with_distance(real_catalog, follow):
+    """명동(area)을 이어받은 턴은 source=history, 거리 int 유지 (gu 규칙과 섞이지 않음)."""
+    api = Api(real_catalog)
+    api.say("명동 맛집 추천해줘")
+    r = api.say(follow)
+    assert r["center"]["source"] == "history" and r["center"]["label"] == "명동"
+    assert r["places"]
+    for p in r["places"]:
+        assert isinstance(p["distance_m"], int) and isinstance(p["walk_min"], int), p
 
 
 def test_gu_wide_more_has_no_far_notice(real_catalog):
@@ -441,7 +522,7 @@ def test_gu_wide_more_has_no_far_notice(real_catalog):
         if not r["places"]:
             break
         assert "1.5km 안" not in r["answer"]
-        assert r["center"]["label"] == "종로구"
+        assert_gu_no_distance(r, "종로구")
 
 
 def test_topic_missing_notice(real_catalog):
@@ -472,7 +553,7 @@ def test_topic_carried_to_more(real_catalog):
     r1 = api.say("강서구 공원 추천해줘")
     r2 = api.say("다른 데 더 추천해줘")
     assert r2["places"], r2["answer"]
-    assert r2["center"]["label"] == "강서구"
+    assert_gu_no_distance(r2, "강서구")
     assert all(p["kind"] == "tour" for p in r2["places"])
     assert not set(ids(r2)) & set(ids(r1))
     # 주제를 이어받음: 맞는 곳이 남아 있으면 '질문 주제는', 다 썼으면 '딱 맞는 곳이 없다' 규칙 — 어느 쪽이든 산책·자연

@@ -1,5 +1,5 @@
 // Q2 화면 시나리오 점검: 헤드리스 Chrome, iPhone 14 Pro(393x852)
-// 사용: node run.mjs <shotsDir>   (서버: 8011 정상, 8012 OpenSearch 끔, 8013 Ollama 끔)
+// 사용: node run.mjs <shotsDir>   (서버: 8011 정상, 8012 OpenSearch 끔, 8013 Ollama 끔 — QA_OK/QA_OS_DOWN/QA_LLM_DOWN으로 변경)
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { launch, newPage, setGeo, sleep } from './cdp.mjs';
 
@@ -38,7 +38,7 @@ async function send(p, text, timeout = 90000) {
   await p.eval(`(() => { const i = document.querySelector('#msg'); i.value = ${JSON.stringify(text)}; document.querySelector('#inp').requestSubmit(); })()`);
   await p.waitFor(`document.querySelectorAll('#chat .bub').length >= ${before + 2} && !document.querySelector('#chat .typing')`, timeout);
   await sleep(500);
-  const sid = await p.eval(`localStorage.getItem('stc.sessionId')`);
+  const sid = await p.eval(`sessionStorage.getItem('stc.sessionId')`);
   if (sid) sessions.add(sid);
   const all = await bubbles(p);
   return all[all.length - 1];
@@ -110,9 +110,9 @@ try {
     `선택 ${selected.title}(${selected.id}) / 새 핀: ${pins2.map(x => x.title).join(', ')} / 답변: ${b2.text.slice(0, 60)}`);
 
   // ---------------- 5. 접힘 B안 → 칩 → 카드
-  await p.eval(`document.querySelector('#toggle').click()`);
+  await p.eval(`document.querySelector('#handle').click()`);
   await sleep(400);
-  const fold = await p.eval(`({ fold: document.querySelector('#fold').innerText, chips: [...document.querySelectorAll('#chips .chip')].map(c => c.innerText), mapHidden: document.querySelector('#map').hidden, toggle: document.querySelector('#toggle').innerText })`);
+  const fold = await p.eval(`({ fold: document.querySelector('#fold').innerText, chips: [...document.querySelectorAll('#chips .chip')].map(c => c.innerText), mapHidden: document.querySelector('#map').hidden, handle: document.querySelector('#handle').innerText })`);
   await p.shot(`${SHOTS}/05-folded.png`);
   check('5', '접힘 B안: 요약 바("○○ 근처 · 추천 N곳")·장소 칩', fold.mapHidden && fold.fold.includes(`${selected.title} 근처`) && fold.fold.includes(`추천 ${pins2.length}곳`) && fold.chips.length === pins2.length,
     JSON.stringify(fold));
@@ -142,6 +142,28 @@ try {
   check('8', '새로고침 → 대화·핀 복원', afterReload.length === beforeReload.length && pins4.map(x => x.id).join() === pins2.map(x => x.id).join()
     && afterReload.map(b => b.text).join('|') === beforeReload.map(b => b.text).join('|'),
     `말풍선 ${beforeReload.length}→${afterReload.length}, 핀 ${pins4.length}`);
+
+  // ---------------- 8b. 새 탭 → 첫 화면 (74d76eb: 세션 ID는 sessionStorage, 같은 탭 새로고침만 복원)
+  const t = await preparePage(ctx);
+  await t.goto(OK + '/');
+  await sleep(800);
+  const tab = await t.eval(`({ home: !document.querySelector('#home').hidden, result: !document.querySelector('#result').hidden, sid: sessionStorage.getItem('stc.sessionId'), legacy: localStorage.getItem('stc.sessionId') })`);
+  await t.shot(`${SHOTS}/08b-new-tab-home.png`);
+  check('8b', '새 탭으로 접속 → 첫 화면(복원 안 함)', tab.home && !tab.result && tab.sid === null && tab.legacy === null, JSON.stringify(tab));
+  await t.close();
+
+  // ---------------- 8c. ↺ 새 대화 → 첫 화면, 다음 요청은 새 세션
+  const oldSid = await p.eval(`sessionStorage.getItem('stc.sessionId')`);
+  await p.eval(`document.querySelector('#newchat').click()`);
+  await sleep(500);
+  const nc = await p.eval(`({ home: !document.querySelector('#home').hidden, result: !document.querySelector('#result').hidden, bubs: document.querySelectorAll('#chat .bub').length, sid: sessionStorage.getItem('stc.sessionId') })`);
+  await p.shot(`${SHOTS}/08c-newchat-home.png`);
+  const bnc = await send(p, '명동 맛집 추천해줘');
+  const reqNc = await lastReq(p);
+  const newSid = await p.eval(`sessionStorage.getItem('stc.sessionId')`);
+  check('8c', '↺ 새 대화 → 첫 화면, 다음 요청 session_id null·새 세션', nc.home && !nc.result && nc.bubs === 0 && nc.sid === null
+    && reqNc.session_id === null && newSid && newSid !== oldSid && bnc.cls === 'bub b',
+    `${JSON.stringify(nc)} / 요청 session_id ${reqNc.session_id} / ${oldSid} → ${newSid}`);
   await p.close();
 
   // ---------------- 9. GPS 허용
@@ -149,13 +171,13 @@ try {
   const g = await preparePage(ctx);
   await g.c.send('Emulation.setGeolocationOverride', { latitude: 37.5759, longitude: 126.9769, accuracy: 30 });
   await g.goto(OK + '/');
-  await g.eval(`localStorage.clear()`);
+  await g.eval(`localStorage.clear(); sessionStorage.clear()`);
   await g.reload();
   const before9 = (await bubbles(g)).length;
   await g.eval(`document.querySelector('.home-chip[data-i="0"]').click()`);
   await g.waitFor(`document.querySelectorAll('#chat .bub').length >= ${before9 + 2} && !document.querySelector('#chat .typing')`, 90000);
   await sleep(600);
-  sessions.add(await g.eval(`localStorage.getItem('stc.sessionId')`));
+  sessions.add(await g.eval(`sessionStorage.getItem('stc.sessionId')`));
   const req9 = await lastReq(g);
   const gp = await pins(g);
   const me = await g.eval(`!!document.querySelector('#map .me')`);
@@ -177,13 +199,13 @@ try {
   await setGeo(ctx, OK, 'deny');
   const d = await preparePage(ctx);
   await d.goto(OK + '/');
-  await d.eval(`localStorage.clear()`);
+  await d.eval(`localStorage.clear(); sessionStorage.clear()`);
   await d.reload();
   const before10 = (await bubbles(d)).length;
   await d.eval(`document.querySelector('.home-chip[data-i="0"]').click()`);
   await d.waitFor(`document.querySelectorAll('#chat .bub').length >= ${before10 + 3} && !document.querySelector('#chat .typing')`, 90000);
   await sleep(600);
-  sessions.add(await d.eval(`localStorage.getItem('stc.sessionId')`));
+  sessions.add(await d.eval(`sessionStorage.getItem('stc.sessionId')`));
   const bd = await bubbles(d);
   const req10 = await lastReq(d);
   const meD = await d.eval(`!!document.querySelector('#map .me')`);
@@ -203,7 +225,7 @@ try {
   // ---------------- 11. 첫 질문이 "거기 근처" (Review Focus 3)
   const f = await preparePage(ctx);
   await f.goto(OK + '/');
-  await f.eval(`localStorage.clear()`);
+  await f.eval(`localStorage.clear(); sessionStorage.clear()`);
   await f.reload();
   const bf = await send(f, '거기 근처 카페 있어?');
   await f.shot(`${SHOTS}/11-demonstrative-first.png`);
@@ -233,7 +255,7 @@ try {
   // ---------------- 14. 서버 꺼짐(네트워크 오류)
   const n = await preparePage(ctx);
   await n.goto(OK + '/');
-  await n.eval(`localStorage.clear()`);
+  await n.eval(`localStorage.clear(); sessionStorage.clear()`);
   await n.reload();
   await n.c.send('Network.enable');
   await n.c.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });

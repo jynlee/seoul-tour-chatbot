@@ -25,7 +25,7 @@ async function freshPage(ctx) {
   const p = await newPage(ctx);
   await p.c.send('Page.addScriptToEvaluateOnNewDocument', { source: RECORD_FETCH });
   await p.goto(BASE + '/');
-  await p.eval(`localStorage.clear()`);
+  await p.eval(`localStorage.clear(); sessionStorage.clear()`);
   await p.reload();
   return p;
 }
@@ -33,7 +33,7 @@ async function freshPage(ctx) {
 const bubbles = (p) => p.eval(`[...document.querySelectorAll('#chat .bub')].map(b => ({cls: b.className, text: b.innerText}))`);
 const pins = (p) => p.eval(`[...document.querySelectorAll('#map .pin')].map(b => ({id: b.dataset.id, cls: b.className, title: b.getAttribute('aria-label'), emoji: b.querySelector('.head').innerText}))`);
 const lastReq = (p) => p.eval(`(() => { const r = window.__reqs.filter(r => r.url.includes('/api/chat')); return r.length ? JSON.parse(r[r.length-1].body) : null; })()`);
-const sid = (p) => p.eval(`localStorage.getItem('stc.sessionId')`);
+const sid = (p) => p.eval(`sessionStorage.getItem('stc.sessionId')`);
 const ids = (ps) => ps.map((x) => x.id).join();
 
 async function send(p, text, timeout = 120000) {
@@ -63,7 +63,7 @@ async function apiPlaces(p) {
 
 // 접힘 상태 장소 칩 이름 (응답 순서와 같아야 함)
 async function chipTitles(p) {
-  await p.eval(`document.querySelector('#toggle').click()`);
+  await p.eval(`document.querySelector('#handle').click()`);
   await sleep(300);
   const t = await p.eval(`[...document.querySelectorAll('#chips .chip')].map(c => c.innerText)`);
   await p.eval(`document.querySelector('#fold').click()`);
@@ -72,9 +72,9 @@ async function chipTitles(p) {
 }
 
 async function foldText(p) {
-  await p.eval(`document.querySelector('#toggle').click()`);
+  await p.eval(`document.querySelector('#handle').click()`);
   await sleep(300);
-  const t = await p.eval(`document.querySelector('#fold').innerText`);
+  const t = (await p.eval(`document.querySelector('#fold').innerText`)).replace(/\s+/g, ' '); // 요약 바는 flex라 줄바꿈이 섞임
   await p.eval(`document.querySelector('#fold').click()`);
   await sleep(300);
   return t;
@@ -128,7 +128,7 @@ try {
   const g1 = await pins(g);
   const foldG = await foldText(g);
   await g.shot(`${SHOTS}/b89-05-gangnam.png`);
-  check('B9-4', '"강남 관광지" → 강남구 기준 관광지 핀(장소 \'강남\'이 기준점 아님)', g1.length > 0 && g1.every((x) => x.cls.includes('tour')) && foldG.includes('강남구 근처'),
+  check('B9-4', '"강남 관광지" → 강남구 기준 관광지 핀(장소 \'강남\'이 기준점 아님)', g1.length > 0 && g1.every((x) => x.cls.includes('tour')) && foldG.includes('강남구 · 추천') && !foldG.includes('근처'), // QA-8: gu면 '근처' 없음
     `${foldG.replace(/\n/g, ' ')} / ${g1.map((x) => x.title).join(', ')}`);
   const ga1 = await apiPlaces(g);
   const gb2 = await send(g, '아까 첫 번째 거 다시 알려줘');
@@ -203,8 +203,23 @@ try {
   await sleep(300);
   const wcard = await w.eval(`document.querySelector('#card').innerText`);
   await w.shot(`${SHOTS}/b89-12-gu-park.png`);
-  check('GU-1', '"강서구 공원 추천해줘" → 강서구 기준, 1번 칩·핀이 강서습지생태공원', wa[0]?.title === '강서습지생태공원' && wchips[0]?.includes('강서습지생태공원') && foldW.includes('강서구'),
-    `${foldW.replace(/\n/g, ' ')} / ${wchips.join(' | ')} / 카드: ${wcard.replace(/\n/g, ' / ')} / ${wb.text}`);
+  check('GU-1', '"강서구 공원 추천해줘" → 강서구 기준, 1번 칩·핀이 강서습지생태공원', wa[0]?.title === '강서습지생태공원' && wchips[0]?.includes('강서습지생태공원'),
+    `${wchips.join(' | ')} / ${wb.text}`);
+  // QA-8 최종: 구 기준이면 요약 바 "강서구 · 추천 N곳"('근처' 없음), 카드에 🚶 도보 줄 없음, 칩에 '분' 없음
+  check('GU-1b', 'QA-8: 요약 바 "강서구 · 추천 N곳"(근처 없음)·카드 도보 줄 없음·칩에 분 없음',
+    foldW.includes(`강서구 · 추천 ${wa.length}곳`) && !foldW.includes('근처') && !wcard.includes('🚶')
+    && wchips.length === wa.length && wchips.every((c) => !/\d+분/.test(c)) && wa.every((x) => x.distance_m === null && x.walk_min === null),
+    `${foldW.replace(/\n/g, ' ')} / ${wchips.join(' | ')} / 카드: ${wcard.replace(/\n/g, ' / ')}`);
+  // 이어받은 턴('다른 데 더')도 gu → 요약 바·칩 같은 규칙
+  await send(w, '다른 데 더 추천해줘');
+  const wa2 = await apiPlaces(w);
+  const wchips2 = await chipTitles(w);
+  const foldW2 = await foldText(w);
+  await w.shot(`${SHOTS}/b89-12b-gu-more.png`);
+  check('GU-1c', 'QA-8: 구 결과 뒤 "다른 데 더"도 "강서구 · 추천 N곳"·칩에 분 없음',
+    foldW2.includes(`강서구 · 추천 ${wa2.length}곳`) && !foldW2.includes('근처') && wchips2.every((c) => !/\d+분/.test(c))
+    && wa2.every((x) => x.distance_m === null),
+    `${foldW2.replace(/\n/g, ' ')} / ${wchips2.join(' | ')}`);
   const wb2 = await send(w, '금천구 산책할 곳');
   await w.shot(`${SHOTS}/b89-13-topic-missing.png`);
   check('GU-2', '"금천구 산책할 곳" → 맞는 곳이 없다고 솔직히 안내 + 핀', /없|못 찾|어려|아쉽/.test(wb2.text) && (await pins(w)).length > 0, wb2.text);

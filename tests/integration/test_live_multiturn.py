@@ -204,6 +204,34 @@ def test_live_gu_nature_topic(live, message):
     assert {deps.catalog[i].gu for i in ids(r)} == {"강서구"}
 
 
+def no_distance(body):
+    return all(p["distance_m"] is None and p["walk_min"] is None for p in body["places"])
+
+
+def test_live_qa8_gu_carried_turns_are_gu_without_distance(live):
+    """QA-8 최종(5bed7dc·2fee772): 구 첫 턴·'다른 데 더'·'맛집은?' 모두 source=gu, 거리·도보 null."""
+    client, _, deps, sessions = live
+    t = Talk(client, sessions)
+    r1 = t.say("강서구 공원 추천해줘")
+    r2 = t.say("다른 데 더 추천해줘")
+    r3 = t.say("맛집은?")
+    for r in (r1, r2, r3):
+        assert r["center"]["source"] == "gu" and r["center"]["label"] == "강서구", r["center"]
+        assert r["places"] and no_distance(r), r["places"]
+        assert {deps.catalog[i].gu for i in ids(r)} == {"강서구"}
+    assert all(p["kind"] == "food" for p in r3["places"])
+
+
+def test_live_qa8_area_carried_turn_keeps_history_and_distance(live):
+    client, _, _, sessions = live
+    t = Talk(client, sessions)
+    t.say("명동 맛집 추천해줘")
+    r = t.say("카페는?")
+    assert r["center"]["source"] == "history" and r["center"]["label"] == "명동"
+    assert r["places"] and all(isinstance(p["distance_m"], int) and isinstance(p["walk_min"], int)
+                               for p in r["places"])
+
+
 def test_live_topic_missing_and_hangang_food(live):
     client, _, _, sessions = live
     r = Talk(client, sessions).say("금천구 산책할 곳")

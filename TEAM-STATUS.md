@@ -29,8 +29,8 @@
 | B5 | 의도 판별 + 추천 + LLM | 팀원1 | B2, B3 | ✅ 팀원1 |
 | B6 | ChatService + FastAPI 앱 | 팀원1 | B4, B5 | ✅ 팀원1 |
 | B7 | 관광공사 상세 정보 보강(detailIntro2 → detail) | 팀원1 | B1 | ✅ 팀원1 (574/574, 2026-10-26) |
-| B8 | 장소 정보 질문 의도(place_info) | 팀원1 | B6, B7 | ✅ 팀원1 · ✅ 팀원3 검증(b689e90, QA-4~7 통과, QA-8 리드 결정 대기) |
-| B9 | 멀티턴(순서·이름 지칭, "다른 데 더", 조건 이어받기, 프롬프트에 최근 대화) | 팀원1 | B8 | ✅ 팀원1 · ✅ 팀원3 검증(b689e90, QA-4~7 통과, QA-8 리드 결정 대기) |
+| B8 | 장소 정보 질문 의도(place_info) | 팀원1 | B6, B7 | ✅ 팀원1 · ✅ 팀원3 검증(d822a58+f413aea, QA-4~8 통과, QA-9 보고) |
+| B9 | 멀티턴(순서·이름 지칭, "다른 데 더", 조건 이어받기, 프롬프트에 최근 대화) | 팀원1 | B8 | ✅ 팀원1 · ✅ 팀원3 검증(d822a58+f413aea, QA-4~8 통과, QA-9 보고) |
 | F1 | 화면 뼈대 + S2a 첫 화면 | 팀원2 | T0 | ✅ 팀원2 |
 | F2 | 일러스트 지도 모듈 | 팀원2 | F1 | ✅ 팀원2 |
 | F3 | 대화·결과·카드·접힘 B안 | 팀원2 | B6, F2 | ✅ 팀원2 |
@@ -168,12 +168,16 @@
 - b689e90 회귀(2026-10-26): 단위 229·통합 33·JS 37·화면 B8·B9 19 + Q2 24 통과. `run.mjs`는 `QA_OK`/`QA_OS_DOWN`/`QA_LLM_DOWN` 환경 변수로 주소 지정 가능(이번엔 8012/8013/8014). test-qa- 세션 남은 것 0.
 - 2026-10-26 중단 시점(사용자 요청으로 종료): QA-8 리드 결정 ①(gu면 distance_m·walk_min null + 프론트 요약 바 "강서구 · 추천 5곳") 반영분은 **아직 병합·확인 안 함**. 확인 완료 기준은 feat/backend b689e90 + feat/frontend ea2ea88(feat/qa e6af8fb). 서버(8012~8014) 꺼짐, test-qa- 세션 0.
 - QA-8(팀원1→리드 결정 ① 확정, 백엔드 5bed7dc→2fee772(최종, d822a58 문서), 프론트 f413aea): 구 기준점일 때 거리·도보가 구 중심점 기준이라 카드 "강서구에서 약 40분"·요약 바 "강서구 근처"가 오해를 줌 → gu일 때 distance/walk null(④ 계약 변경) 또는 프론트에서 숨김 제안.
+- **QA-8 최종 확인(2026-10-27, feat/backend d822a58 + feat/frontend f413aea 병합, 충돌 없음):** 통과. 테스트 수정 — `assert_contract`(gu면 거리 null), `test_gu_wide_may_exceed_radius`(응답 거리 null이라 좌표로 1.5km 밖 확인), 구 '다른 데 더'·주제 이어받기에 source gu·거리 null 검사. 새 테스트 — 구 이어받은 턴('다른 데 더'·'맛집은?')·두 번 이어받기 gu, area/place/gps 거리 int, 명동 이어받기 history+int, 실서비스 2건. 화면 — `#toggle`→`#handle`, 세션 ID `sessionStorage`, B9-4 "강남구 · 추천", GU-1b·1c, `run.mjs` 8b(새 탭 첫 화면)·8c(↺ 새 대화). 결과: 단위 239+xfail 2·통합 35·JS 52·화면 B8·B9 21/21·Q2 25/26(11b LLM 문구, 회귀 아님).
+- **버그 QA-9(2026-10-27, 리드에게 보고):** 구 안에 맞는 곳이 0곳이면(카탈로그 카페 14곳뿐 → "강서구 카페 추천해줘", "강서구 공원" 뒤 "카페는?", 마포구도 같음) `recommend.py`가 구 분기를 지나 가장 가까운 곳 대체로 빠짐 → `source:"gu"`인데 `distance_m` 12838·`walk_min` 192(용산구·종로구 카페). 화면은 "🚶 강서구에서 약 192분"·칩 "192분"이 다시 보임(QA-8 이전 문제). 재현: `tests/api/test_multiturn_api.py::test_qa9_gu_with_no_match_still_no_distance`(xfail strict — 고치면 XPASS로 실패하니 xfail 표시를 지울 것).
+- 함정: 요약 바 `#fold` innerText는 flex라 "강서구\n· 추천 5곳"처럼 줄바꿈이 섞임 → 공백으로 바꿔 비교. 세션 ID는 74d76eb부터 `sessionStorage`(새 탭은 첫 화면).
 
 ## ⑧ 다음에 이어서 할 일
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
 - 팀원1 (2026-10-26): B7 데이터 574/574 ✅, 개선 3개(2글자 장소명·"궁" 단어 경계·"다른 데 더" 먼 곳 안내) ✅, QA-4~7 수정 ✅(팀원3 재확인 대기), 구 기준점 전체 검색·관광 세부 주제(산책·역사·전시·쇼핑·체험·야경) ✅, QA-8(구 기준점 거리 null + 구를 이어받은 "다른 데 더"도 source "gu") ✅ 2fee772 — 리드가 다음 세션 할 일로 적은 "이어받은 구 source=gu"는 이미 반영됨(실화면 확인만 남음: 요약 바 "강서구 · 추천 5곳"). 2026-10-26 사용자 요청으로 여기서 중단. 남은 일: 팀원3 QA의 B8·B9 버그 리포트 대응. 남은 개선 후보: 3글자 장소명 오인(⑦ 참고).
 - 팀원1: B1~B6 완료(`feat/backend`). 남은 일은 팀원3(Q1·Q2) 버그 리포트 대응. Q1은 `tests/conftest.py`의 `small_catalog`·`FakeEmbedder`·`FakeSearcher`·`FakeLLM`과 `InMemoryHistoryRepo`로 `create_app(Deps(...))`를 만들면 됨(예: `tests/test_chat_service.py`).
-- 팀원3 다음에 바로 할 일 (2026-10-26 중단 시점, QA-8 확인):
+- 팀원3 (2026-10-27): QA-8 최종 확인 끝(⑦ 참고). 남은 일: QA-9 수정되면 xfail 지우고 재확인, 리드 병합 후 실제 휴대폰 위치 권한 팝업은 사람이 확인.
+- (완료) 팀원3 2026-10-26 중단 시점 할 일 — QA-8 확인:
   1. worktree `agent-a3b7fc5a951212262`(feat/qa)에서 `git merge origin/feat/backend`(2fee772 이상) + `git merge origin/feat/frontend`(f413aea 이상). TEAM-STATUS 충돌은 양쪽 살리기.
   2. 테스트 기대값 맞추기(QA-8 최종 규칙, ④ 참고): 기준점이 구면 places의 `distance_m`·`walk_min`이 null, 구 결과 뒤 "다른 데 더"·"카페는?"도 center.source=`gu`(이전엔 history). 고칠 곳 예상: `tests/api/test_multiturn_api.py`의 `test_gu_wide_may_exceed_radius`(distance>1500 검사 → null 검사로), `test_topic_carried_to_more`·`test_gu_wide_more_has_no_far_notice`(center.source gu 추가 검사), `tests/api/test_chat_api.py`의 `assert_contract`(center 있으면 거리 int라는 가정 → gu면 null 허용), `tests/integration/test_live_api.py::test_live_area_and_gu`. 새 테스트: gu 첫 턴·이어받은 턴 모두 거리 null, area/place/gps는 거리 int 유지, 명동(area) 이어받기는 source history.
   3. 화면: `run_b89.mjs` GU-1 기대를 요약 바 "강서구 · 추천 5곳"('근처' 없음)·카드에 🚶 도보 줄 없음·칩에 분 없음으로 바꾸고, 8012로 `run_b89.mjs` + 8012/8013/8014로 `run.mjs`(QA_OK/QA_OS_DOWN/QA_LLM_DOWN) 재실행.

@@ -94,10 +94,13 @@ def test_live_area_and_gu(live):
     seongsu = post(client, new_sid(sessions), "성수 카페")
     assert seongsu["center"]["source"] == "area"
     check_places(seongsu, deps.catalog)
+    assert all(isinstance(p["distance_m"], int) and isinstance(p["walk_min"], int) for p in seongsu["places"])
     jongno = post(client, new_sid(sessions), "종로 관광지")
     assert jongno["center"]["source"] == "gu" and jongno["center"]["label"] == "종로구"
     assert jongno["places"] and all(p["kind"] == "tour" for p in jongno["places"])
     check_places(jongno, deps.catalog)
+    # QA-8: 구 기준점이면 거리·도보 null
+    assert all(p["distance_m"] is None and p["walk_min"] is None for p in jongno["places"])
 
 
 def test_live_gps_and_no_location(live):

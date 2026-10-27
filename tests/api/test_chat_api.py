@@ -34,7 +34,8 @@ def assert_contract(body, catalog):
         assert catalog[p["id"]].title == p["title"]
         assert isinstance(p["tel"], str) and isinstance(p["image"], str)
         assert in_seoul(p["lat"], p["lng"]), f"좌표가 서울 밖: {p}"
-        if body["center"] is None:
+        if body["center"] is None or body["center"]["source"] == "gu":
+            # 기준점이 없거나 구 전체(gu)면 거리·도보 null (QA-8: 구 중심에서 잰 거리는 의미 없음)
             assert p["distance_m"] is None and p["walk_min"] is None
         else:
             assert isinstance(p["distance_m"], int) and isinstance(p["walk_min"], int)
