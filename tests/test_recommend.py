@@ -208,13 +208,25 @@ def test_topic_word_in_title_ranks_first(fake_embedder):
     q = "종로 근처 궁이나 박물관"
     rec = recommend(q, detect_intent(q), center, FakeSearcher(catalog), fake_embedder, catalog)
     titles = [p.title for p in rec.places]
-    assert set(titles[:2]) == {"경복궁", "국립고궁박물관"}, titles  # 제목에 질문의 주제 말('궁' 낱말·'박물관')
+    assert titles[0] == "경복궁", titles  # 제목에 질문의 주제(역사) 말 '궁'이 낱말로 있음
     assert titles.index("무궁화동산") > titles.index("북촌한옥마을")
 
 
-def test_topic_words():
+def test_topic_words_only_of_detected_topic():
     from app.intent import topic_words
 
-    assert topic_words("종로 근처 궁이나 박물관") == ["궁", "박물관"]
-    assert topic_words("궁금한 게 있는데 종로 관광지") == []
-    assert "공원" in topic_words("강서구 공원 추천해줘")
+    assert topic_words("종로 근처 궁이나 박물관", "history") == ["궁"]
+    assert topic_words("궁금한 게 있는데 종로 관광지", None) == []
+    assert topic_words("강서구 공원 추천해줘", "nature") == ["공원"]
+    assert topic_words("한강 야경 볼 곳", "night") == ["야경"]  # '한강'은 산책·자연 말 → 한강 제목이 야경 명소를 밀지 않게
+
+
+def test_night_view_not_pushed_by_hangang_titles(fake_embedder):
+    places = [
+        _tour("n1", "반포대교 달빛무지개분수", "건축/조형물", 37.5122, 126.9960, "서초구"),
+        _tour("n2", "한강 수상택시", "체험관광지", 37.5125, 126.9965, "서초구"),
+    ]
+    catalog = {p.id: p for p in places}
+    q = "한강 야경 볼 곳"
+    rec = recommend(q, detect_intent(q), None, FakeSearcher(catalog), fake_embedder, catalog)
+    assert rec.places[0].title == "반포대교 달빛무지개분수"

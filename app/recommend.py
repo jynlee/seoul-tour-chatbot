@@ -109,9 +109,9 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
         seen.add(pid)
         candidates.append(p)
 
-    # 세부 주제: 제목에 질문의 주제 말('궁'·'박물관'·'공원')이 있으면 2, 주제 분류·제목 패턴이면 1 — 장소가 늘어
+    # 세부 주제: 제목에 질문의 주제 말('궁'·'공원'·'야경')이 있으면 2, 주제 분류·제목 패턴이면 1 — 장소가 늘어
     # 같은 분류(종로구 역사관광지 등)가 많아지자 분류만으로는 경복궁·창덕궁이 뒤로 밀림
-    words = topic_words(message)
+    words = topic_words(message, intent.topic)
 
     def boost(p: Place) -> int:
         return (2 if title_has_topic_word(p.title, words, intent.topic) else 0) +             (1 if matches_topic(p.category, p.title, intent.topic) else 0)

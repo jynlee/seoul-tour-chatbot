@@ -100,12 +100,11 @@ def detect_topic(message: str) -> str | None:
     return next((key for key, t in TOUR_TOPICS.items() if any(has_word(message, k) for k in t.keywords)), None)
 
 
-def topic_words(message: str) -> list[str]:
-    """질문에 나온 관광 주제 말 전부 ('궁이나 박물관' → ['궁', '박물관'])."""
-    words: list[str] = []
-    for t in TOUR_TOPICS.values():
-        words += [k for k in t.keywords if has_word(message, k) and k not in words]
-    return words
+def topic_words(message: str, topic: str | None) -> list[str]:
+    """질문에 나온 그 주제의 말 ('궁이나 박물관', 역사 → ['궁']). 다른 주제 말('한강 야경'의 '한강')은 뺀다."""
+    if topic is None:
+        return []
+    return [k for k in TOUR_TOPICS[topic].keywords if has_word(message, k)]
 
 
 def title_has_topic_word(title: str, words: list[str], topic: str | None) -> bool:
