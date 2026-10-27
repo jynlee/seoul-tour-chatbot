@@ -192,6 +192,12 @@
 - 함정: 통합 실행 중 `tests/test_history.py::test_keeps_latest_100[mysql]`가 한 번 17건으로 실패(단독 3회 통과) — 같은 MySQL을 쓰는 다른 세션이 `test-%` 세션을 지우면 생김. 통합은 다른 팀원 테스트와 겹치지 않게 돌릴 것.
 - 함정: 요약 바 `#fold` innerText는 flex라 "강서구\n· 추천 5곳"처럼 줄바꿈이 섞임 → 공백으로 바꿔 비교. 세션 ID는 74d76eb부터 `sessionStorage`(새 탭은 첫 화면).
 
+- **데이터 확장 QA(2026-10-27, qa-data, `feat/qa-data` ← feat/data 16e86aa, 서버 8012~8014·v3):** 단위 387+xfail 9·통합 46·JS 52·화면 B8·B9 27/27·Q2 26/26. 설계 §6 질문 5개·사용자 실제 대화 8턴·기존 멀티턴 모두 기대대로(원문은 `docs/manual-qa.md` "데이터 확장 QA"). 새 `tests/api/test_data_expansion_api.py`(새 카탈로그 30건: 서울 전체/이어받기·서울역·서울숲·서울 시청·지역명 제목·세부 장소 묶기·구 목록 뒤 '그 근처 카페는?').
+- **버그 QA-10(리드에게 보고):** '창덕궁과 후원 [유네스코 세계유산]'·'서울 운현궁'·'서울 효창공원'·'서울 명동성당'처럼 붙은 제목('서울 ' 55곳, '○○과 ○○' 4곳)을 부르는 이름으로 못 찾음 → "창덕궁 주차돼?"·"운현궁 입장료" 되묻기, "효창공원 근처 맛집" 기준점 없음. `app/center.py::title_aliases`. 재현 `test_qa10_*`(xfail strict 6).
+- **버그 QA-11(리드에게 보고, d976c2c 회귀):** '이 근처'·'근처에'·'주변에' + 세부 주제 이어 묻기("이 근처 박물관도 있어?")가 지시어로 안 잡혀 `wants_whole_seoul` → 서울 전체. `app/dialog.py`. 재현 `test_qa11_*`(xfail strict 3). 고쳐지면 XPASS로 실패하니 xfail 표시를 지울 것.
+- 화면 스크립트 낡은 기대값 수정: run_b89 QA-4(궁 목록 질문), GU-1(1번 공원+5곳 안 습지), QA-9(강서구 → 양천구), GU-2(금천구 산책 → 야경), DX-1·2 추가 / run.mjs 6(핀 DOM 순서 대신 첫 칩 이름).
+- 함정: area/place 기준 추천은 kNN 상위 100곳 중 반경 안 → 음식점 1,586곳이 되자 아주 가까운 곳이 빠짐("청계천 근처 맛집" 84m 음식점은 kNN 261위, 1번은 890m 카페). 규칙대로라 버그로 안 올림, 품질 메모로 보고.
+
 ### 팀원4 data (`feat/data`, worktree `.claude/worktrees/data`)
 - 2026-10-27 데이터 확장 1단계(설계 `docs/superpowers/specs/2026-10-27-data-expansion-design.md` §4) — 계획 `docs/superpowers/plans/2026-10-27-data-expansion-phase1.md`.
 - `scripts/fetch_list.py`: `areaBasedList2` + `lDongRegnCd=11`, 종류 12·14·28·39·38·15(숙박 32 제외), 한 페이지(1,000건)마다 `data/raw/seoul_list.json`에 저장·이어 받기. `--codes`는 신분류 코드 이름을 `data/raw/lcls_codes.json`에. 받은 결과 7,643곳(12:767, 14:580, 15:188, 28:125, 38:4,392, 39:1,591), 호출 12번(+시험 호출 1번).
@@ -214,6 +220,7 @@
 - 2026-10-27 사용자 결정 반영(d976c2c): '서울에서…'·'서울 전체'·'서울 야경'(서울역·서울숲 제외)이거나, 장소·지역·지시어 없이 관광 세부 주제(야경·산책·역사…)만 묻는 새 질문은 직전 기준점을 이어받지 않고 서울 전체에서(`dialog.wants_whole_seoul` → chat 이 `resolve_center` 에 last_center 를 안 넘김). "카페는?/공원은?"·"다른 데 더"·"거기 근처…"는 그대로 이어받음. 제목 주제 말 +2 순위 규칙은 사용자 유지 승인. main 병합은 'QA 후'로 결정(리드).
 
 ## ⑧ 다음에 이어서 할 일
+- qa-data (2026-10-27): 데이터 확장 QA 끝(⑦ 참고). **QA-10·QA-11 수정 전에는 main 병합 보류 권장**(둘 다 사용자 대화에서 바로 보이는 문제). 수정되면 `tests/api/test_data_expansion_api.py`의 xfail 지우고 재확인.
 - 팀원4 (2026-10-27): 데이터 확장 2단계 반영·v3 색인 ✅(⑦ 참고). **남은 일 = 개요·상세 나머지 받기**(한도 각 1,000건/일): 매일 `python scripts/fetch_overview.py`(남은 2,454건, 문화 352·음식 1,586·레포츠 125·축제 188·쇼핑 199 → 약 3일)와 `python scripts/enrich_detail.py --raw data/raw/seoul_merged.json --out data/raw/detail.json --skip-from data/seoul_tour_enriched.json`(남은 1,959건 → 약 2일). 받은 뒤 `python scripts/apply_merged.py` → (개요가 늘었으면) `OPENSEARCH_INDEX=seoul-tour-v3 python scripts/build_index.py` → 커밋. 상세만 늘었으면 재색인 불필요.
 - 팀원4 2단계 메모 ①~④(신분류 매핑·지역명 제목 제외·세부 장소 겹침·개요 임베딩/v3) ✅ 반영됨. 알려진 한계: "종로 역사 관광지"는 제목에 '역사'가 든 박물관이 앞에 나오고 경복궁은 5곳 밖(임베딩 순위가 대표성을 잘 못 잡음, 인기도 데이터 없음). "강남 관광지"는 갤러리(문화시설)만 나옴. 음식점 개요는 아직 없음(받으면 재색인).
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.

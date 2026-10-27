@@ -120,7 +120,9 @@ try {
   await sleep(300);
   const chipCard = await p.eval(`({ hidden: document.querySelector('#card').hidden, text: document.querySelector('#card').innerText, pressed: !!document.querySelector('#chips .chip[aria-pressed="true"]') })`);
   await p.shot(`${SHOTS}/06-folded-chip-card.png`);
-  check('6', '접힘 상태 칩 클릭 → 카드', !chipCard.hidden && chipCard.text.includes(pins2[0].title) && chipCard.pressed, chipCard.text.replace(/\n/g, ' / '));
+  // 첫 칩 = 응답 1번. 지도 핀의 DOM 순서(pins2)는 그리는 순서라 다를 수 있어 칩 글자("☕ 커피친구 3분")에서 이름을 뽑아 비교
+  const chip0 = fold.chips[0].replace(/^\S+\s+/, '').replace(/\s+\d+분$/, '');
+  check('6', '접힘 상태 칩 클릭 → 카드', !chipCard.hidden && chipCard.text.includes(chip0) && chipCard.pressed, `${chip0} / ${chipCard.text.replace(/\n/g, ' / ')}`);
   await p.eval(`document.querySelector('#fold').click()`);
   await sleep(400);
   check('6b', '요약 바 클릭 → 지도 다시 펼침', await visible(p, '#map'), '');
