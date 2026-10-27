@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from app.catalog import Place, has_coords
 from app.center import Center
 from app.geo import SEOUL_GU, haversine_m, walk_min
-from app.intent import Intent, matches_topic
+from app.intent import Intent, matches_topic, title_has_topic_word, topic_words
 from app.schemas import PlaceOut
 
 CANDIDATES_K = 100
@@ -109,8 +109,12 @@ def _recommend(message, intent, center, searcher, embedder, catalog, k, radius_m
         seen.add(pid)
         candidates.append(p)
 
+    # 세부 주제: 제목에 질문의 주제 말('궁'·'박물관'·'공원')이 있으면 2, 주제 분류·제목 패턴이면 1 — 장소가 늘어
+    # 같은 분류(종로구 역사관광지 등)가 많아지자 분류만으로는 경복궁·창덕궁이 뒤로 밀림
+    words = topic_words(message)
+
     def boost(p: Place) -> int:
-        return 1 if matches_topic(p.category, p.title, intent.topic) else 0
+        return (2 if title_has_topic_word(p.title, words, intent.topic) else 0) +             (1 if matches_topic(p.category, p.title, intent.topic) else 0)
 
     candidates.sort(key=lambda p: -boost(p))  # 안정 정렬: 주제 맞는 곳 먼저, 그 안에서는 관련도순
     candidates = one_per_group(candidates)

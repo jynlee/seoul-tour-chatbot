@@ -191,3 +191,30 @@ def test_recommend_no_two_parts_of_same_palace(fake_embedder):
     titles = [p.title for p in rec.places]
     assert sum(t.startswith("창덕궁") for t in titles) == 1, titles
     assert "종묘 [유네스코 세계유산]" in titles and "창경궁" in titles
+
+
+# ---- 데이터가 6배로 늘어 같은 분류(역사관광지 등)가 너무 많음: 질문에 나온 주제 말이 제목에 있는 곳을 더 앞으로 ----
+
+def test_topic_word_in_title_ranks_first(fake_embedder):
+    places = [  # FakeSearcher 는 카탈로그 순서 = 관련도순
+        _tour("h1", "북촌한옥마을", "역사관광지", 37.5826, 126.9830, "종로구"),
+        _tour("h2", "종로 무계원", "역사관광지", 37.5940, 126.9640, "종로구"),
+        _tour("h3", "무궁화동산", "휴양관광지", 37.5850, 126.9700, "종로구"),  # '궁'이 낱말 속에 있을 뿐
+        _tour("h4", "국립고궁박물관", "문화시설", 37.5770, 126.9750, "종로구", ct="14"),
+        _tour("h5", "경복궁", "역사관광지", 37.5796, 126.9770, "종로구"),
+    ]
+    catalog = {p.id: p for p in places}
+    center = Center(lat=37.58, lng=126.98, label="종로구", source="gu")
+    q = "종로 근처 궁이나 박물관"
+    rec = recommend(q, detect_intent(q), center, FakeSearcher(catalog), fake_embedder, catalog)
+    titles = [p.title for p in rec.places]
+    assert set(titles[:2]) == {"경복궁", "국립고궁박물관"}, titles  # 제목에 질문의 주제 말('궁' 낱말·'박물관')
+    assert titles.index("무궁화동산") > titles.index("북촌한옥마을")
+
+
+def test_topic_words():
+    from app.intent import topic_words
+
+    assert topic_words("종로 근처 궁이나 박물관") == ["궁", "박물관"]
+    assert topic_words("궁금한 게 있는데 종로 관광지") == []
+    assert "공원" in topic_words("강서구 공원 추천해줘")
