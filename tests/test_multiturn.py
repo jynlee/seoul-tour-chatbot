@@ -9,13 +9,14 @@ from app.history import InMemoryHistoryRepo
 from app.llm import CLARIFY_ANSWER, ORDINAL_OUT_OF_RANGE, info_template_answer
 from app.schemas import ChatRequest
 from tests.conftest import FakeEmbedder, FakeLLM, FakeSearcher
+from tests.conftest import CATALOG_574
 
 CAFE = "A05020900"
 
 
 @pytest.fixture(scope="module")
 def real_catalog(tmp_path_factory):
-    catalog = load_catalog("data/seoul_tour.json", tmp_path_factory.mktemp("e") / "none.json")
+    catalog = load_catalog(CATALOG_574, tmp_path_factory.mktemp("e") / "none.json")
     by_title = {p.title: p for p in catalog.values()}
     # B8용 상세 정보: 고려삼계탕은 주차 정보만 없음, 개성만두 궁은 주차 '불가능'
     gs = by_title["고려삼계탕"]

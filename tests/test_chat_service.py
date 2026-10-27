@@ -10,6 +10,7 @@ from app.llm import template_answer
 from app.main import SEARCH_UNAVAILABLE_DETAIL, create_app
 from app.schemas import ChatRequest
 from tests.conftest import FakeEmbedder, FakeLLM, FakeSearcher
+from tests.conftest import CATALOG_574
 
 
 @pytest.fixture
@@ -180,7 +181,7 @@ def test_api_clarify_then_name_only(tmp_path):
     from app.catalog import load_catalog
     from app.llm import CLARIFY_ANSWER
 
-    catalog = load_catalog("data/seoul_tour.json", tmp_path / "none.json")
+    catalog = load_catalog(CATALOG_574, tmp_path / "none.json")
     sp = next(p for p in catalog.values() if p.title == "대원군별장(석파정)")
     catalog[sp.id] = dataclasses.replace(sp, tel="02-395-0100", detail={"contact": "02-395-0100"})
     client = TestClient(create_app(Deps(catalog=catalog, embedder=FakeEmbedder(),

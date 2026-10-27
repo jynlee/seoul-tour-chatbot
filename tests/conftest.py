@@ -3,6 +3,10 @@ import pytest
 
 from app.catalog import Place
 
+# 2026-10-27 데이터 확장(574 → 3,444곳) 전 데이터. 특정 장소·"강서구에 카페 없음"(QA-9) 같은 대화 시나리오를 고정한
+# 테스트는 이 파일로 돈다(로직 검증용). 새 데이터 자체는 tests/test_catalog.py 의 test_new_data_* 와 통합 테스트가 본다.
+CATALOG_574 = "tests/fixtures/seoul_tour_574.json"
+
 
 def _p(id, title, ct, category, cat3, addr, lat, lng, gu, tel="", image=""):
     kind = "food" if ct == "39" else ("event" if ct == "15" else "tour")

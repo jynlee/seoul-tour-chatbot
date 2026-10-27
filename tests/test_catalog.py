@@ -2,7 +2,9 @@ import json
 
 from app.catalog import category_name, has_coords, load_catalog
 
-RAW = "data/seoul_tour.json"
+from tests.conftest import CATALOG_574  # noqa: E402
+
+RAW = CATALOG_574  # 574곳 시절 데이터로 고정 (카탈로그 읽기 규칙 테스트)
 
 
 def _by_title(catalog, title):
@@ -97,3 +99,33 @@ def test_existing_cat_wins():
 
     item = _new_item("39", "FD050100", cat2="A0502", cat3="A05020100")
     assert effective_codes(item) == ("A0502", "A05020100")
+
+
+# ---- 2026-10-27 데이터 확장 뒤 실제 데이터 (data/seoul_tour.json 3,444곳) ----
+
+def test_new_data_counts():
+    from collections import Counter
+
+    from app.catalog import CAFE_CAT3
+
+    catalog = load_catalog("data/seoul_tour.json", "data/seoul_tour_enriched.json")
+    assert len(catalog) == 3444
+    assert sum(has_coords(p) for p in catalog.values()) >= 3430
+    assert "32" not in {p.content_type for p in catalog.values()}  # 숙박 없음
+    assert Counter(p.category for p in catalog.values())["기타"] <= 1
+    cafes = [p for p in catalog.values() if p.cat3 == CAFE_CAT3]
+    assert len(cafes) >= 250
+    assert any(p.gu == "강서구" for p in cafes)  # QA-9 때는 강서구 카페 0곳
+
+
+def test_new_data_landmarks_and_names():
+    from app.center import match_place
+
+    catalog = load_catalog("data/seoul_tour.json", "data/seoul_tour_enriched.json")
+    titles = {p.title for p in catalog.values()}
+    for t in ("경복궁", "덕수궁", "창경궁", "남산서울타워", "반포대교 달빛무지개분수", "국립중앙박물관", "강서습지생태공원"):
+        assert t in titles, t
+    assert "메디원약국" not in titles  # 사후면세점 개별 매장은 뺌
+    for q in ("명동 맛집 추천", "한강 야경 볼 곳", "홍대 근처 카페", "강남 맛집"):
+        assert match_place(q, catalog) is None, q  # 지역 이름은 지역으로
+    assert match_place("경복궁 근처 맛집", catalog).title == "경복궁"

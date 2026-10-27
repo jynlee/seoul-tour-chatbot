@@ -5,11 +5,12 @@ from app.catalog import load_catalog
 from app.center import match_place, resolve_center, title_aliases
 from app.dialog import resolve_reference
 from app.schemas import PlaceOut
+from tests.conftest import CATALOG_574
 
 
 @pytest.fixture(scope="module")
 def catalog(tmp_path_factory):
-    return load_catalog("data/seoul_tour.json", tmp_path_factory.mktemp("e") / "none.json")
+    return load_catalog(CATALOG_574, tmp_path_factory.mktemp("e") / "none.json")
 
 
 def _out(p):

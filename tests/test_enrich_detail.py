@@ -2,6 +2,7 @@ import json
 
 from app.catalog import load_catalog
 from scripts.enrich_detail import clean_value, pick_detail
+from tests.conftest import CATALOG_574
 
 
 def test_clean_value_br_and_tags():
@@ -51,7 +52,7 @@ def test_pick_detail_event():
 def test_catalog_loads_detail(tmp_path):
     enriched = tmp_path / "e.json"
     enriched.write_text(json.dumps({"398373": {"tel": "02-1", "detail": {"parking": "불가능"}}}), encoding="utf-8")
-    catalog = load_catalog("data/seoul_tour.json", enriched)
+    catalog = load_catalog(CATALOG_574, enriched)
     assert catalog["398373"].detail == {"parking": "불가능"}
     assert catalog["126512"].detail == {}
 
