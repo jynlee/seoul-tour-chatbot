@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE, Place
 from app.center import match_place, matched_alias
-from app.intent import ALL_TYPES, TOUR_TYPES, Intent, has_word
+from app.intent import ALL_TYPES, TOUR_TYPES, Intent, detect_intent, has_word
 from app.schemas import HistoryMessage, PlaceOut
 
 # ---- 정보 질문 ----
@@ -177,6 +177,20 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
         if last_places:
             return from_out(last_places[0], "demonstrative")
     return None
+
+
+# "서울에서·서울 전체·서울 야경" (서울역·서울숲 같은 이름은 아님)
+_WHOLE_SEOUL = re.compile(r"서울(?=$|[\s?!.,]|에서|에|의|은|는|을|이|가|도|전체|시내|안|곳곳)")
+# "카페는?"·"공원은?"처럼 말 하나에 '은/는'만 붙인 이어 묻기
+_SHORT_FOLLOW_UP = re.compile(r"^\s*[가-힣A-Za-z]{1,8}\s*(?:은|는)\s*[?？]?\s*$")
+
+
+def wants_whole_seoul(message: str) -> bool:
+    """직전 기준점을 이어받지 않고 서울 전체에서 찾을 새 질문: '서울'을 말했거나, 세부 주제(야경·산책·역사…)만
+    물은 새 추천 질문. "카페는?"·"다른 데 더"·"거기 근처…" 같은 이어 묻기는 아님 (사용자 결정 2026-10-27)."""
+    if is_more_request(message) or has_demonstrative(message) or _SHORT_FOLLOW_UP.match(message):
+        return False
+    return bool(_WHOLE_SEOUL.search(message)) or detect_intent(message).topic is not None  # 맛집·카페 질문은 주제 없음
 
 
 def ordinal_out_of_range(message: str, last_places: list[PlaceOut]) -> bool:

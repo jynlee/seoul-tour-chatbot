@@ -368,3 +368,45 @@ def test_demonstrative_near_after_earlier_list_with_generic_title(real_catalog):
     r3 = s.say("그 근처 카페는?")
     assert r3.center.label == first.title and r3.center.source == "place", (r3.center, first.title)
     assert r3.places and all(real_catalog[p.id].cat3 == CAFE for p in r3.places)
+
+
+# ---- 사용자 결정(2026-10-27): '서울에서…'·주제만 묻는 새 질문은 직전 기준점을 이어받지 않고 서울 전체에서 ----
+
+@pytest.mark.parametrize("q", ["서울에서 데이트 코스 추천해줘", "야경 보기 좋은곳 알려줘", "산책하기 좋은 곳 알려줘",
+                               "서울 전체에서 역사 관광지 알려줘"])
+def test_fresh_question_does_not_inherit_center(real_catalog, q):
+    s = Session(real_catalog)
+    assert s.say("명동 맛집 추천해줘").center.label == "명동"
+    r = s.say(q)
+    assert r.center is None, (q, r.center)
+    assert r.places
+
+
+@pytest.mark.parametrize("q", ["카페는?", "공원은?", "다른 데 더 추천해줘", "거기 근처 관광지"])
+def test_follow_up_keeps_center(real_catalog, q):
+    s = Session(real_catalog)
+    r1 = s.say("명동 맛집 추천해줘")
+    assert r1.center.label == "명동"
+    r = s.say(q)
+    expected = r1.places[0].title if q.startswith("거기") else "명동"  # '거기 근처'는 직전 첫 추천
+    assert r.center is not None and r.center.label == expected, (q, r.center)
+
+
+def test_seoul_station_is_still_an_area(real_catalog):
+    s = Session(real_catalog)
+    s.say("명동 맛집 추천해줘")
+    assert s.say("서울역 근처 맛집").center.label == "서울역"
+
+
+def test_wants_whole_seoul():
+    from app.dialog import wants_whole_seoul
+
+    assert wants_whole_seoul("서울에서 데이트 코스 추천해줘")
+    assert wants_whole_seoul("서울 야경 명소")
+    assert wants_whole_seoul("야경 보기 좋은곳 알려줘")
+    assert not wants_whole_seoul("서울역 근처 맛집")
+    assert not wants_whole_seoul("서울숲 근처 카페")
+    assert not wants_whole_seoul("카페는?")
+    assert not wants_whole_seoul("공원은?")
+    assert not wants_whole_seoul("다른 데 더 추천해줘")
+    assert not wants_whole_seoul("거기 근처 산책할 곳")
