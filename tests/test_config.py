@@ -40,3 +40,10 @@ def test_chat_request_rejects_blank():
     with pytest.raises(ValidationError):
         ChatRequest(message="가" * 501)
     assert ChatRequest(message="  광화문 맛집  ").message == "광화문 맛집"
+
+
+def test_chat_request_session_id_max_64():
+    # chat_message.session_id 가 VARCHAR(64) 라서 더 길면 기록이 저장되지 않음 (QA-1)
+    assert ChatRequest(session_id="a" * 64, message="안녕").session_id == "a" * 64
+    with pytest.raises(ValidationError):
+        ChatRequest(session_id="a" * 65, message="안녕")
