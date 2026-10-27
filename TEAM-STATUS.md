@@ -198,11 +198,22 @@
 - `scripts/analyze_list.py`: API 없이 분포 보고(쇼핑 거르기·체인 후보·중복·짧은 이름·호출 예상).
 - **함정**: 새 목록 6,469곳은 `cat1~3`이 비어 있고 `lclsSystm1~3`(신분류)만 있음 → 지금 `category_name`(CAT2_MAP)·카페 판별(`cat3 == A05020900`)로는 "기타"·카페 아님이 됨. 2단계에서 신분류 → 분류 이름 매핑 필요(예: FD050100 카페, FD050200 찻집, SH010100 백화점).
 - **함정**: 쇼핑 4,392곳 중 4,138곳이 `SH040300 사후면세점`(약국·브랜드 매장 등 개별 매장). 시내·공항 면세점(SH0401/0402)은 0곳. 제목 규칙(거리·상가·시장)은 '올리브영 명동거리점'처럼 지점명에 걸리므로 지점명을 떼고 봐야 함.
-- 기존 574곳 중 76곳은 새 목록에 없음(축제 54곳 + 롯데백화점 잠실점·동화면세점 등 22곳) — 넣을지 리드 결정 대기.
+- 기존 574곳 중 76곳은 새 목록에 없음(축제 54곳 + 롯데백화점 잠실점·동화면세점 등 22곳) → 사용자 결정으로 모두 뺌(설계 §3.1).
+- 2026-10-27 사용자 결정 반영: `scripts/build_merged.py` → `data/raw/seoul_merged.json` 3,444곳(쇼핑 199, 프랜차이즈 5곳 제외, 50m 중복 1쌍). `scripts/fetch_overview.py`(detailCommon2) → `data/raw/overview.json`, `scripts/enrich_detail.py --skip-from`(detailIntro2, 새 장소만) → `data/raw/detail.json`.
+- **하루 한도: detailCommon2·detailIntro2 각각 1,000건/일**(오퍼레이션별 따로). 10/27 개요 990/3,444, 상세 1,000/2,959. 응답은 건당 0.5~1.7초(가끔 연결 타임아웃 15초 → 실패분은 다음 실행에 재시도).
+- 2단계(계획 `docs/superpowers/plans/2026-10-27-data-expansion-phase2.md`, main 59eb64d 병합 뒤):
+  - `scripts/apply_merged.py`: `data/raw/*` → `data/seoul_tour.json`(형식 그대로)·`data/seoul_tour_enriched.json`(기존 tel·detail 유지 + `overview`). 여러 번 돌려도 같은 결과 — 개요·상세를 더 받은 뒤 다시 돌리면 됨.
+  - `app/catalog.py::effective_codes`: cat3가 없으면 신분류 → 기존 cat2/cat3 코드(음식은 FD05·FD030100 → 카페 A05020900 등). 매핑은 둘 다 있는 장소의 실제 대응으로 정함. 카페 134 → 272곳, "기타" 1곳.
+  - `app/center.py::AREA_LIKE_TITLES`: AREAS·구 이름·구 별칭·한강·서울과 같은 제목은 이름 찾기에서 제외("명동 맛집"·"한강 야경"은 지역/주제로).
+  - `app/recommend.py::group_key/one_per_group`: 제목 첫 단어(끝 '과/와' 뗌, 서울·국립·한국·대한민국 제외)가 같고 500m 안이면 한 목록에 하나만(창덕궁 인정문·낙선재, 반포한강공원 달빛광장).
+  - `app/recommend.py` 주제 가산: 제목에 **감지한 주제의 말**(역사 '궁', 자연 '공원', 야경 '야경' 등, 한 글자는 낱말 경계)이 있으면 +2. 장소가 6배가 되자 분류만으로는 종로구 역사관광지 수백 곳 중 경복궁이 뒤로 밀려서. 다른 주제 말은 안 셈('한강 야경'의 '한강'이 야경 명소를 밀던 문제).
+  - `app/search.py`: 임베딩 문장 뒤에 개요 앞 150자(`OVERVIEW_CHARS`, 기존 문장 약 32토큰 + 128토큰 한도). 쓰기 보호(`index_name_guard(write=True)`)에 `seoul-tour-v2`·`food-materials`. 설정·`.env.example` 기본 인덱스 `seoul-tour-v3`(3,444건 색인, 1분 23초). **worktree `.env`는 v2 그대로 → 실행 시 `OPENSEARCH_INDEX=seoul-tour-v3`**.
+  - 테스트: 특정 장소·"강서구 카페 없음" 같은 574곳 시나리오 단위 테스트 31개는 `tests/fixtures/seoul_tour_574.json`(`tests.conftest.CATALOG_574`)로 고정(새 코드가 574곳 데이터로 전부 통과함을 확인). 새 데이터는 `test_new_data_*`. 통합 테스트 7개 기대값을 새 사실로(QA-9 → 양천구 카페 0곳·노원구 1곳, 주제 없음 → 금천구 야경, 강서구 공원 5곳 안에 습지공원).
+  - 추천 대상(좌표 있는 곳) 3,435/3,444곳.
 
 ## ⑧ 다음에 이어서 할 일
-- 팀원4 (2026-10-27): 사용자 결정 반영(설계 §3.1) → 합친 목록 `data/raw/seoul_merged.json` 3,444곳 ✅ → 개요 받기 진행 중(`python scripts/fetch_overview.py`, 결과 `data/raw/overview.json`, 이어 받기 됨). 개요가 끝나면 상세(detailIntro2, 새 장소만) 받기 스크립트.
-- 팀원4 2단계 메모(지금 하지 않음, main 59eb64d 병합됨 → 시작할 때 feat/data를 main 기준으로 맞춤): ① 신분류(lclsSystm) → 분류명·카페 판별 매핑(`category_name`·`CAFE_CAT3`가 cat3만 봄, 새 장소 6,469곳은 cat3 없음) ② '강남·홍대·명동·한강'처럼 지역 이름과 같은 제목은 이름 찾기(`_match_place`) 대상에서 제외("명동 맛집 추천"이 장소로 잡힘) ③ 한 궁 안 세부 장소(창덕궁 인정문·낙선재·향나무 등)가 추천에 겹쳐 나오는 문제 ④ `overview.json` → enriched `"overview"`, 임베딩 문장에 개요, `seoul-tour-v3` 재색인.
+- 팀원4 (2026-10-27): 데이터 확장 2단계 반영·v3 색인 ✅(⑦ 참고). **남은 일 = 개요·상세 나머지 받기**(한도 각 1,000건/일): 매일 `python scripts/fetch_overview.py`(남은 2,454건, 문화 352·음식 1,586·레포츠 125·축제 188·쇼핑 199 → 약 3일)와 `python scripts/enrich_detail.py --raw data/raw/seoul_merged.json --out data/raw/detail.json --skip-from data/seoul_tour_enriched.json`(남은 1,959건 → 약 2일). 받은 뒤 `python scripts/apply_merged.py` → (개요가 늘었으면) `OPENSEARCH_INDEX=seoul-tour-v3 python scripts/build_index.py` → 커밋. 상세만 늘었으면 재색인 불필요.
+- 팀원4 2단계 메모 ①~④(신분류 매핑·지역명 제목 제외·세부 장소 겹침·개요 임베딩/v3) ✅ 반영됨. 알려진 한계: "종로 역사 관광지"는 제목에 '역사'가 든 박물관이 앞에 나오고 경복궁은 5곳 밖(임베딩 순위가 대표성을 잘 못 잡음, 인기도 데이터 없음). "강남 관광지"는 갤러리(문화시설)만 나옴. 음식점 개요는 아직 없음(받으면 재색인).
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
 - 팀원1 (2026-10-27): QA-9(구 안 0~2곳일 때도 거리 null + 다른 구 장소임을 답에서 밝힘) ✅ → qa-2 재확인(xfail 제거) 요청함.
 - 팀원1 (2026-10-27): 괄호 장소 이름("석파정"·"길상사") 인식 + 되묻기 뒤 이름만 답하면 앞 질문 이어받기 ✅(⑦ 참고) → qa-2에게 재확인 요청함.
