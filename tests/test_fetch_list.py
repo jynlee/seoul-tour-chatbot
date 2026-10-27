@@ -75,3 +75,13 @@ def test_saved_file_has_no_key(tmp_path):
     pages = {("12", 1): (["a"], 1)}
     fetch_all(new_state(), "SECRETKEY123", out, rows=10, types=("12",), fetch=_fake_pages(pages))
     assert "SECRETKEY123" not in out.read_text(encoding="utf-8")
+
+
+def test_code_names():
+    from scripts.fetch_list import code_names
+
+    rows = [{"lclsSystm1Cd": "SH", "lclsSystm1Nm": "쇼핑", "lclsSystm2Cd": "SH06", "lclsSystm2Nm": "시장",
+             "lclsSystm3Cd": "SH060200", "lclsSystm3Nm": "상설시장"},
+            {"lclsSystm1Cd": "SH", "lclsSystm1Nm": "쇼핑", "lclsSystm2Cd": "SH01", "lclsSystm2Nm": "백화점",
+             "lclsSystm3Cd": "SH010100", "lclsSystm3Nm": "백화점"}]
+    assert code_names(rows) == {"SH": "쇼핑", "SH06": "시장", "SH060200": "상설시장", "SH01": "백화점", "SH010100": "백화점"}

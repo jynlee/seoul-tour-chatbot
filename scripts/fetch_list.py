@@ -24,6 +24,7 @@ from scripts.enrich_tel import BASE_URL, QuotaExceeded, _scrub, save_json  # noq
 CONTENT_TYPES = ("12", "14", "28", "39", "38", "15")
 SEOUL_LDONG = "11"
 DEFAULT_OUT = ROOT / "data" / "raw" / "seoul_list.json"
+CODES_OUT = ROOT / "data" / "raw" / "lcls_codes.json"
 
 
 def new_state() -> dict:
@@ -74,6 +75,31 @@ def fetch_page(api_key: str, content_type: str, page: int, rows: int) -> tuple[l
     return parse_page(data)
 
 
+def code_names(rows: list[dict]) -> dict[str, str]:
+    """lclsSystmCode2 결과 → {분류 코드(1·2·3단계): 이름}."""
+    names: dict[str, str] = {}
+    for row in rows:
+        for level in ("1", "2", "3"):
+            code = row.get(f"lclsSystm{level}Cd")
+            if code:
+                names[code] = row.get(f"lclsSystm{level}Nm", "")
+    return names
+
+
+def fetch_codes(api_key: str) -> dict[str, str]:
+    """신분류체계(lclsSystm) 코드 이름 전체 (1번 호출). 새 목록은 cat1~3 이 빈 곳이 많아 이 코드로 분류한다."""
+    import requests
+
+    query = {"serviceKey": api_key, "MobileOS": "ETC", "MobileApp": "seoul-tour-chatbot", "_type": "json",
+             "lclsSystmListYn": "Y", "numOfRows": 1000, "pageNo": 1}
+    resp = requests.get(f"{BASE_URL}/lclsSystmCode2", params=query, timeout=30)
+    if "LIMITED_NUMBER_OF_SERVICE_REQUESTS" in resp.text or resp.status_code == 429:
+        raise QuotaExceeded(resp.text[:200])
+    resp.raise_for_status()
+    rows, _total = parse_page(resp.json())
+    return code_names(rows)
+
+
 def fetch_all(state: dict, api_key: str, out: Path, rows: int = 1000, types=CONTENT_TYPES,
               fetch=fetch_page, max_calls: int | None = None, sleep: float = 0.0) -> dict:
     """종류별로 끝날 때까지 페이지를 넘겨 받는다. 한 페이지마다 저장. QuotaExceeded 는 저장 뒤 그대로 올린다."""
@@ -108,6 +134,7 @@ def main(argv=None) -> int:
     parser.add_argument("--rows", type=int, default=1000, help="한 페이지 건수")
     parser.add_argument("--max-calls", type=int, default=None, help="이번 실행 최대 호출 수")
     parser.add_argument("--sleep", type=float, default=0.2)
+    parser.add_argument("--codes", action="store_true", help="분류 코드 이름만 받아 data/raw/lcls_codes.json 에 저장")
     args = parser.parse_args(argv)
 
     try:
@@ -116,6 +143,16 @@ def main(argv=None) -> int:
         print(e)
         return 1
     key = settings.tour_api_key
+
+    if args.codes:
+        try:
+            names = fetch_codes(key)
+        except Exception as e:
+            print(f"실패: {_scrub(e, key)}")
+            return 1
+        save_json(CODES_OUT, names)
+        print(f"분류 코드 {len(names)}개 저장")
+        return 0
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
