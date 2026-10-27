@@ -56,3 +56,31 @@ def test_live_multiturn_myeongdong(live):
     # 모든 장소는 카탈로그에 있어야 함 (지어낸 장소 없음)
     for r in (r1, r2, r3):
         assert all(p["id"] in deps.catalog for p in r["places"])
+
+
+def test_live_parenthesized_title_and_clarify(live):
+    """사용자 재현: '대원군별장(석파정)'을 '석파정'·'대원군별장'으로 부르기 + 되묻기 뒤 이름만 답하기."""
+    client, deps, sessions = live
+    sid = f"test-live-sp-{uuid.uuid4().hex[:12]}"
+    sessions.append(sid)
+
+    def say(message):
+        r = client.post("/api/chat", json={"session_id": sid, "message": message}, timeout=120)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    assert say("종로 관광지 추천해줘")["places"]
+    r2 = say("석파정 무료 입장이야?")
+    assert r2["answer"].startswith("대원군별장(석파정) — 요금 정보는 없어요") and "02-395-0100" in r2["answer"]
+    assert r2["places"] == [] and r2["center"] is None
+
+
+    # 새 세션: 장소 없이 물음 → 되묻기 → 이름만 답하면 앞 질문(요금)에 답함
+    sid = f"test-live-sp-{uuid.uuid4().hex[:12]}"
+    sessions.append(sid)
+    assert say("종로 관광지 추천해줘")["places"]
+    from app.llm import CLARIFY_ANSWER
+    assert say("무료 입장이야?")["answer"] == CLARIFY_ANSWER
+    r3 = say("대원군별장")
+    assert r3["answer"].startswith("대원군별장(석파정) — 요금 정보는 없어요") and "02-395-0100" in r3["answer"]
+    assert r3["places"] == [] and r3["center"] is None

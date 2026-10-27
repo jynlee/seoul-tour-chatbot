@@ -80,6 +80,11 @@ class ChatService:
 
         # 1) 장소 정보 질문
         if not near and not more:
+            # 되묻기 뒤 장소 이름만 답함("무료야?" → 되묻기 → "석파정") → 앞 질문(물어본 정보·설명)을 이어받는다
+            prev_q = self._clarified_question(messages)
+            if ref is not None and prev_q is not None and not fields and not is_explain(msg):
+                return self._place_info(sid, msg, ref, asked_fields(prev_q), history_texts,
+                                        question=f"{msg} {prev_q}")
             if ordinal_out_of_range(msg, last_places):
                 return self._reply(sid, msg, ORDINAL_OUT_OF_RANGE.format(n=len(last_places)))
             if ref is None and has_demonstrative(msg) and is_explain(msg):
@@ -140,6 +145,16 @@ class ChatService:
         return self._reply(sid, msg, answer, center=center_out, places=rec.places)
 
     @staticmethod
+    def _clarified_question(messages) -> str | None:
+        """직전 챗봇 답이 장소를 되물은 것(CLARIFY_ANSWER)이면 그 앞 사용자 질문."""
+        if len(messages) < 2:
+            return None
+        bot, user = messages[-1], messages[-2]
+        if bot.role == "assistant" and bot.message == CLARIFY_ANSWER and user.role == "user":
+            return user.message
+        return None
+
+    @staticmethod
     def _last_topic(messages) -> str | None:
         """마지막 추천을 만든 사용자 질문의 관광 세부 주제."""
         for i in range(len(messages) - 1, 0, -1):
@@ -158,7 +173,7 @@ class ChatService:
                 shown.update(p.id for p in m.places)
         return shown
 
-    def _place_info(self, sid, msg, ref, fields, history_texts) -> ChatResponse:
+    def _place_info(self, sid, msg, ref, fields, history_texts, question=None) -> ChatResponse:
         if ref is None:
             return self._reply(sid, msg, CLARIFY_ANSWER)
         place = ref.place
@@ -166,7 +181,7 @@ class ChatService:
             answer = info_template_answer(place, fields)  # 물어본 정보가 하나도 없음 → 지어내지 않게 LLM 생략
         else:
             try:
-                answer = self.deps.llm.generate(build_info_prompt(msg, history_texts, place, fields))
+                answer = self.deps.llm.generate(build_info_prompt(question or msg, history_texts, place, fields))
             except LLMUnavailable:
                 answer = info_template_answer(place, fields)
         # 응답은 center=null·places=[] (지도 유지). 기록에는 설명한 장소를 center 로 남겨 다음 "거기"가 이 장소를 가리키게 함.

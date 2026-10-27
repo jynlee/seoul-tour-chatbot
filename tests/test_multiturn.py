@@ -254,3 +254,45 @@ def test_topic_carried_to_more_request(real_catalog):
     assert all(p.distance_m is None and p.walk_min is None for p in r2.places)
     assert not set(_titles(r2)) & set(_titles(r1))
     assert "산책·자연" in s.deps.llm.prompts[-1]  # 직전 주제를 이어받음
+
+
+# ---------------- 괄호 이름 + 되묻기 뒤 이름만 답하기 (사용자 재현) ----------------
+
+def _seokpajeong_session(real_catalog):
+    by_title = {p.title: p for p in real_catalog.values()}
+    sp = by_title["대원군별장(석파정)"]
+    catalog = dict(real_catalog)
+    catalog[sp.id] = dataclasses.replace(sp, tel="02-395-0100", detail={"contact": "02-395-0100"})  # 요금 정보 없음
+    s = Session(catalog)
+    s.deps.searcher = FakeSearcher(catalog, scores={by_title["바라캇 서울"].id: 3.0, sp.id: 2.0})
+    return s, catalog[sp.id]
+
+
+def test_parenthesized_title_info_question(real_catalog):
+    s, sp = _seokpajeong_session(real_catalog)
+    r1 = s.say("종로 관광지 추천해줘")
+    assert "대원군별장(석파정)" in _titles(r1)
+    r2 = s.say("석파정 무료 입장이야?")
+    assert r2.answer == info_template_answer(sp, ["fee"])  # 요금 정보 없음 → 지어내지 않고 문의처 안내
+    assert "02-395-0100" in r2.answer
+    assert r2.places == [] and r2.center is None
+
+
+def test_name_only_answer_after_clarify_keeps_question(real_catalog):
+    s, sp = _seokpajeong_session(real_catalog)
+    s.say("종로 관광지 추천해줘")
+    r2 = s.say("무료 입장이야?")
+    assert r2.answer == CLARIFY_ANSWER
+    r3 = s.say("대원군별장")
+    assert r3.answer == info_template_answer(sp, ["fee"])  # 앞 질문(요금)을 이어받아 답함
+    assert r3.places == [] and r3.center is None
+
+
+def test_name_only_after_clarify_explain(real_catalog):
+    s, sp = _seokpajeong_session(real_catalog)
+    r2 = s.say("거기 어디야?")
+    assert r2.answer == CLARIFY_ANSWER
+    calls = len(s.deps.llm.prompts)
+    r3 = s.say("석파정")
+    assert r3.places == [] and r3.center is None  # 추천이 아니라 장소 설명
+    assert sp.title in s.deps.llm.prompts[calls]

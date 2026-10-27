@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 
 from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE, Place
-from app.center import match_place
+from app.center import match_place, matched_alias
 from app.intent import ALL_TYPES, TOUR_TYPES, Intent, has_word
 from app.schemas import HistoryMessage, PlaceOut
 
@@ -145,10 +145,10 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
     if idx is not None and last_places and -len(last_places) <= idx < len(last_places):
         return from_out(last_places[idx], "ordinal")
 
-    # 2) 장소 이름: 최근 추천 목록에 있는 이름 우선, 없으면 카탈로그
-    in_last = [p for p in last_places if p.title and p.title in message]
+    # 2) 장소 이름(괄호 뺀 이름·괄호 안 이름 포함): 최근 추천 목록에 있는 이름 우선, 없으면 카탈로그
+    in_last = [(len(a), p) for p in last_places if p.title and (a := matched_alias(p.title, message, loose_title=True))]
     if in_last:
-        return from_out(max(in_last, key=lambda p: len(p.title)), "title")
+        return from_out(max(in_last, key=lambda h: h[0])[1], "title")
     named = match_place(message, catalog)
     if named is not None:
         return Reference(named, "title")
