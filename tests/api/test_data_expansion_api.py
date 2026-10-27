@@ -2,7 +2,8 @@
 
 POST /api/chat·GET /api/history (가짜 검색·LLM + 새 카탈로그 data/seoul_tour.json, 상세·개요 포함).
 FakeSearcher는 카탈로그 순서로 돌려주므로 '어느 장소가 몇 번째'가 아니라 기준점·이어받기·묶기 규칙만 본다.
-xfail(strict) = 이번 QA에서 찾은 버그 재현(QA-10·QA-11). 고쳐지면 XPASS로 실패하니 xfail 표시를 지울 것.
+QA-10·QA-11·리드 결정(접속어 이어 묻기)·품질 ②는 feat/data 0c2f9d3에서 고쳐져 xfail을 지움.
+남은 xfail(strict): '또 ○○ 있어?' 이어 묻기, 품질 ①(kNN 후보 밖 가까운 곳)·③(국립민속박물관 분류). 고쳐지면 XPASS로 실패하니 xfail 표시를 지울 것.
 """
 import pytest
 
@@ -64,9 +65,8 @@ def test_user_conversation_near_cafe_after_gu_list(new_catalog):
     assert r2["places"] and all(p["category"] == "카페/전통찻집" for p in r2["places"])
 
 
-# QA-11: '이 근처'·'근처에'·'주변에'는 지시어로 안 잡혀(REF_DEMONSTRATIVES에 없음), 세부 주제가 있으면
+# QA-11(0c2f9d3에서 고침): '이 근처'·'근처에'·'주변에'는 지시어로 안 잡혀(REF_DEMONSTRATIVES에 없음), 세부 주제가 있으면
 # wants_whole_seoul → 직전 기준점을 버리고 서울 전체에서 고름. (예: 종로 관광지 → "이 근처 박물관도 있어?" → 용산·성북구 대학 박물관)
-@pytest.mark.xfail(strict=True, reason="QA-11: '이 근처/근처에/주변에 + 세부 주제' 이어 묻기가 서울 전체로 바뀜 (app/dialog.py wants_whole_seoul)")
 @pytest.mark.parametrize("first, second", [
     ("종로 관광지 추천해줘", "이 근처 박물관도 있어?"),
     ("홍대 맛집 추천해줘", "근처에 산책할 곳 있어?"),
@@ -108,10 +108,9 @@ def test_no_two_parts_of_same_place_in_one_list(new_catalog, message):
 
 # ---------------------------------------------------------------- QA-10: 새 데이터의 문화재식 제목
 
-# 새 데이터의 대표 명소 제목이 '창덕궁과 후원 [유네스코 세계유산]'·'서울 운현궁'·'서울 효창공원'·'서울 명동성당'처럼
+# QA-10(0c2f9d3에서 고침): 새 데이터의 대표 명소 제목이 '창덕궁과 후원 [유네스코 세계유산]'·'서울 운현궁'·'서울 효창공원'·'서울 명동성당'처럼
 # 붙어 있어(‘서울 ’로 시작 55곳, '○○과 ○○' 4곳) 사람들이 부르는 이름으로는 못 찾음 → 정보 질문은 되묻기,
 # "효창공원 근처 맛집"은 기준점 없이 서울 전체(도봉구·동대문구 음식점). 위치: app/center.py title_aliases.
-@pytest.mark.xfail(strict=True, reason="QA-10: '서울 ○○'·'○○과 ○○' 제목을 부르는 이름으로 못 찾음 (app/center.py title_aliases)")
 @pytest.mark.parametrize("message, title", [
     ("창덕궁 주차돼?", "창덕궁과 후원 [유네스코 세계유산]"),
     ("운현궁 입장료 얼마야?", "서울 운현궁"),
@@ -124,7 +123,6 @@ def test_qa10_heritage_style_titles_by_common_name(new_catalog, message, title):
     assert p is not None and p.title == title
 
 
-@pytest.mark.xfail(strict=True, reason="QA-10: '창덕궁 주차돼?'가 되묻기로 끝남")
 def test_qa10_changdeokgung_info_not_clarify(new_catalog):
     r = Api(new_catalog).say("창덕궁 주차돼?")
     assert_place_info(r)
@@ -142,19 +140,26 @@ def test_known_landmarks_still_found(new_catalog):
 
 # ---------------------------------------------------------------- 리드 결정(2026-10-27): 접속어 + 짧은 이어 묻기
 
-# '그럼/그러면/그리고/또' + 짧은 이어 묻기는 직전 기준점 유지(서울 전체 아님). 지금은 세부 주제가 있어 서울 전체로 감.
-@pytest.mark.xfail(strict=True, reason="리드 결정: '그럼/그러면/그리고/또' + 짧은 이어 묻기는 직전 기준점 유지 (app/dialog.py wants_whole_seoul)")
+# '그럼/그러면/그리고/또' + 짧은 이어 묻기는 직전 기준점 유지(서울 전체 아님). 0c2f9d3: '접속어 + ○○은?' 꼴만 이어받음.
 @pytest.mark.parametrize("first, second, source, label", [
     ("강서구 카페 추천해줘", "그럼 산책할 곳은?", "gu", "강서구"),
     ("종로 관광지 추천해줘", "그러면 박물관은?", "gu", "종로구"),
     ("명동 맛집 추천해줘", "그리고 야경 명소는?", "history", "명동"),
-    ("홍대 맛집 추천해줘", "또 공원 있어?", "history", "홍대"),
 ])
 def test_connective_short_follow_up_keeps_center(new_catalog, first, second, source, label):
     api = Api(new_catalog)
     api.say(first)
     r = api.say(second)
     assert r["center"] and (r["center"]["source"], r["center"]["label"]) == (source, label)
+
+
+# 리드 결정에 '또'도 들어 있지만 0c2f9d3은 '또 + ○○은?' 꼴만 봄 → "또 공원 있어?"는 아직 서울 전체
+@pytest.mark.xfail(strict=True, reason="리드 결정: '또 ○○ 있어?'도 직전 기준점 유지 — 0c2f9d3은 '○○은?' 꼴만 (app/dialog.py)")
+def test_connective_tto_question_keeps_center(new_catalog):
+    api = Api(new_catalog)
+    api.say("홍대 맛집 추천해줘")
+    r = api.say("또 공원 있어?")
+    assert r["center"] and (r["center"]["source"], r["center"]["label"]) == ("history", "홍대")
 
 
 def test_connective_with_seoul_word_is_still_whole_seoul(new_catalog):
@@ -183,8 +188,7 @@ def test_q1_nearest_food_in_radius_included(new_catalog):
     assert nearest.id in [p["id"] for p in r["places"]], nearest.title
 
 
-# ② 기준점 장소의 세부 장소('덕수궁 돈덕전' 0m, '반포한강공원 달빛광장')가 결과에 나옴
-@pytest.mark.xfail(strict=True, reason="품질 ②: 기준점 장소와 같은 묶음(세부 장소)이 결과에 나옴 (app/recommend.py one_per_group에 기준점 미포함)")
+# ② 기준점 장소의 세부 장소('덕수궁 돈덕전' 0m, '반포한강공원 달빛광장')가 결과에 나오던 문제 (0c2f9d3에서 고침)
 # (가짜 검색 순서로는 '반포한강공원 근처'의 달빛광장이 안 뽑혀 재현 안 됨 → 실서비스 tests/integration/test_live_data_expansion.py)
 @pytest.mark.parametrize("message", ["덕수궁 근처 볼거리"])
 def test_q2_center_parts_excluded(new_catalog, message):
@@ -198,3 +202,32 @@ def test_q2_center_parts_excluded(new_catalog, message):
 def test_q3_folk_museum_is_culture(new_catalog):
     p = next(p for p in new_catalog.values() if p.title.startswith("국립민속박물관"))
     assert p.category == "문화시설"
+
+
+# ---------------------------------------------------------------- 0c2f9d3 확인에서 찾은 것
+
+# QA-12(0c2f9d3 회귀): '근처/주변'이 들어가면 무조건 이어 묻기로 봄 → 사용자가 다른 곳을 직접 말해도("한강 근처 …")
+# 그곳이 지역·장소로 안 잡히면 직전 구(강서구)를 이어받음. 고치기 전에는 서울 전체("한강 야경 볼 곳"은 지금도 서울 전체).
+@pytest.mark.xfail(strict=True, reason="QA-12: 'X 근처 + 주제'에서 X가 기준점으로 안 잡히면 직전 구를 이어받음 (app/dialog.py _NEAR_HERE)")
+@pytest.mark.parametrize("second", ["한강 근처 야경 볼 곳", "롯데월드타워 근처 야경 명소"])
+def test_qa12_named_near_does_not_inherit_gu(new_catalog, second):
+    api = Api(new_catalog)
+    api.say("강서구 공원 추천해줘")
+    r = api.say(second)
+    assert r["center"] is None or r["center"]["label"] != "강서구", r["center"]
+
+
+# QA-10b: '&'로 붙은 제목('롯데월드타워&롯데월드몰')과 '롯데월드타워 서울스카이'는 '롯데월드타워'로 못 찾음
+@pytest.mark.xfail(strict=True, reason="QA-10b: '○○&○○' 제목을 앞 이름으로 못 찾음 (app/center.py title_aliases)")
+def test_qa10b_ampersand_title(new_catalog):
+    p = match_place("롯데월드타워 근처 맛집", new_catalog)
+    assert p is not None and p.title.startswith("롯데월드타워")
+
+
+def test_heritage_alias_regressions(new_catalog):
+    """0c2f9d3 별칭 회귀 확인: 시장·둘레길·역 이름."""
+    assert match_place("선릉역 맛집", new_catalog) is None            # '선릉' 별칭이 역 이름을 가로채지 않음
+    assert match_place("남대문시장 근처 맛집", new_catalog).title == "남대문시장"
+    assert match_place("광장시장 근처 카페", new_catalog).title == "광장시장"
+    assert match_place("종묘 근처 맛집", new_catalog).title == "종묘 [유네스코 세계유산]"
+    assert match_place("불암산코스 어디야?", new_catalog).title == "[서울둘레길 3코스] 불암산코스"

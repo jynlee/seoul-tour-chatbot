@@ -2,7 +2,7 @@
 
 실행: OPENSEARCH_INDEX=seoul-tour-v3 pytest -m integration tests/integration/test_live_data_expansion.py
 LLM은 가짜(답 문구는 안 봄). 대화 기록은 `test-qa-` 세션만 쓰고 끝나면 지운다.
-xfail(strict) = 리드가 data에게 맡긴 문제. 고쳐지면 XPASS로 실패하니 xfail 표시를 지울 것.
+xfail(strict) = 리드가 data에게 맡긴 문제(①만 남음, ②는 0c2f9d3에서 고침). 고쳐지면 XPASS로 실패하니 xfail 표시를 지울 것.
 """
 import dataclasses
 
@@ -56,8 +56,7 @@ def test_live_q1_namsan_tower(live):
     assert "남산서울타워" in [p["title"] for p in r["places"]]
 
 
-# ② 기준점 장소의 세부 장소가 결과에 나옴 ("덕수궁 근처" 1번 덕수궁 돈덕전 0m, "반포한강공원 근처" 반포한강공원 달빛광장)
-@pytest.mark.xfail(strict=True, reason="품질 ②: 기준점 장소의 세부 장소가 결과에 나옴 (app/recommend.py one_per_group)")
+# ② (0c2f9d3에서 고침) 기준점 장소의 세부 장소가 결과에 나오던 문제 ("덕수궁 근처" 1번 덕수궁 돈덕전 0m, "반포한강공원 근처" 반포한강공원 달빛광장)
 @pytest.mark.parametrize("message", ["덕수궁 근처 볼거리", "반포한강공원 근처 관광지"])
 def test_live_q2_center_parts_excluded(live, message):
     r = say(live, message)
@@ -65,8 +64,7 @@ def test_live_q2_center_parts_excluded(live, message):
     assert key and not [p["title"] for p in r["places"] if group_key(p["title"]) == key]
 
 
-# ② 묶기: 같은 궁의 세부 장소가 500m 넘게 떨어지면 한 목록에 둘 (창덕궁 다래나무·향나무 800m)
-@pytest.mark.xfail(strict=True, reason="품질 ②: 같은 궁 세부 장소가 500m 넘으면 안 묶임 (app/recommend.py GROUP_RADIUS_M)")
+# ② (0c2f9d3에서 고침, 창덕궁이 기준점이 되어 세부 장소 제외) 묶기: 같은 궁의 세부 장소가 500m 넘게 떨어지면 한 목록에 둘 (창덕궁 다래나무·향나무 800m)
 def test_live_q2_one_changdeokgung_part(live):
     r = say(live, "창덕궁 근처 관광지")
     parts = [p["title"] for p in r["places"] if group_key(p["title"]) == "창덕궁"]
