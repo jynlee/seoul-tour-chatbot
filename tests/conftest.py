@@ -41,7 +41,7 @@ class FakeEmbedder:
 
 
 class FakeSearcher:
-    """카탈로그에서 type/cat3 조건에 맞는 장소를 카탈로그 순서대로(점수 내림차순) 돌려준다.
+    """카탈로그에서 type/cat3(·near 반경) 조건에 맞는 장소를 카탈로그 순서대로(점수 내림차순) 돌려준다.
 
     scores: {place_id: score}를 주면 그 점수로 정렬. fail=True면 SearchUnavailable.
     """
@@ -52,10 +52,11 @@ class FakeSearcher:
         self.fail = fail
         self.calls = []
 
-    def knn(self, vector, content_types, cat3, k):
+    def knn(self, vector, content_types, cat3, k, near=None):
+        from app.geo import haversine_m
         from app.search import SearchUnavailable
 
-        self.calls.append({"content_types": set(content_types), "cat3": cat3, "k": k})
+        self.calls.append({"content_types": set(content_types), "cat3": cat3, "k": k, "near": near})
         if self.fail:
             raise SearchUnavailable("가짜 검색 서버 꺼짐")
         hits = []
@@ -64,6 +65,8 @@ class FakeSearcher:
             if p.content_type not in content_types:
                 continue
             if cat3 and p.cat3 != cat3:
+                continue
+            if near is not None and not (p.lat and p.lng and haversine_m(near[0], near[1], p.lat, p.lng) <= near[2]):
                 continue
             hits.append((p.id, self.scores.get(p.id, 1.0 - i / (n + 1))))
         hits.sort(key=lambda h: -h[1])

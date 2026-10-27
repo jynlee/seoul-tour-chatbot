@@ -59,6 +59,8 @@ LCLS_CAT2 = {  # 긴 접두어부터 맞춤
     "SH": "A0401",
 }
 _CULTURE_TYPE = "14"
+# 신분류 산업관광(EX06)에는 박물관이 섞여 있음('국립민속박물관'·'뮤지엄 김치간'이 기타산업관광지) → 문화시설로
+_MUSEUM_WORDS = ("박물관", "미술관", "기념관", "뮤지엄", "뉴지엄", "전시관", "과학관")
 
 
 def _by_prefix(table: dict[str, str], code: str) -> str:
@@ -78,7 +80,10 @@ def effective_codes(item: dict) -> tuple[str, str]:
         return "A0502", _by_prefix(LCLS_FOOD_CAT3, code)
     if str(item.get("contenttypeid")) == _CULTURE_TYPE:
         return "A0206", ""
-    return _by_prefix(LCLS_CAT2, code), ""
+    cat2 = _by_prefix(LCLS_CAT2, code)
+    if cat2 == "A0204" and any(w in item.get("title", "") for w in _MUSEUM_WORDS):
+        return "A0206", ""
+    return cat2, ""
 
 
 @dataclass(frozen=True)

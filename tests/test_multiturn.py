@@ -415,8 +415,13 @@ def test_wants_whole_seoul():
               "여기 산책할 곳 있어?", "이곳 야경 명소는?"):
         assert not wants_whole_seoul(m), m
     # 리드 결정: '그럼/그러면/그리고/또' + 짧은 '○○은?' 이어 묻기도 이어받기
-    for m in ("그럼 산책할 곳은?", "그러면 야경 명소는?", "그리고 박물관은?", "또 역사 유적지는?"):
+    for m in ("그럼 산책할 곳은?", "그러면 야경 명소는?", "그리고 박물관은?", "또 역사 유적지는?", "또 공원 있어?",
+              "그럼 야경 볼 곳 추천해줘"):
         assert not wants_whole_seoul(m), m
     # '서울'을 낱말로 말하면 근처가 있어도 서울 전체, 연결어 없는 새 주제 질문도 서울 전체
     assert wants_whole_seoul("역사 유적지 알려줘")
     assert wants_whole_seoul("그럼 서울 야경 명소는?")
+    # QA-12: 다른 곳을 직접 말한 '○○ 근처'는 이어 묻기가 아님 (그곳이 기준점으로 안 잡혀도 직전 구를 이어받지 않음)
+    assert wants_whole_seoul("한강 근처 야경 볼 곳")
+    assert wants_whole_seoul("롯데월드타워 근처 야경 명소")
+    assert not wants_whole_seoul("박물관도 이 근처에 있어?")

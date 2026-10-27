@@ -336,8 +336,8 @@ def test_bad_coord_place_name_is_not_center(client):
 class GhostSearcher(FakeSearcher):
     """카탈로그에 없는 id를 섞어 돌려주는 검색 서버."""
 
-    def knn(self, vector, content_types, cat3, k):
-        return [("0000001", 99.0), ("가짜", 98.0)] + super().knn(vector, content_types, cat3, k)
+    def knn(self, vector, content_types, cat3, k, near=None):
+        return [("0000001", 99.0), ("가짜", 98.0)] + super().knn(vector, content_types, cat3, k, near)
 
 
 def test_llm_invented_place_not_in_places(client, deps, catalog):

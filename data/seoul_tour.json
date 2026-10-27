@@ -13639,33 +13639,6 @@
       "lclsSystm3": "VE040100"
      },
      {
-      "addr1": "서울특별시 종로구 세종대로 198 (세종로)",
-      "addr2": "",
-      "areacode": "",
-      "cat1": "",
-      "cat2": "",
-      "cat3": "",
-      "contentid": "2992823",
-      "contenttypeid": "12",
-      "createdtime": "20230706141655",
-      "firstimage": "https://tong.visitkorea.or.kr/cms/resource/06/2987806_image2_1.jpg",
-      "firstimage2": "https://tong.visitkorea.or.kr/cms/resource/06/2987806_image3_1.jpg",
-      "cpyrhtDivCd": "Type1",
-      "mapx": "126.9775595773",
-      "mapy": "37.5740796449",
-      "mlevel": "6",
-      "modifiedtime": "20261022100055",
-      "sigungucode": "",
-      "tel": "",
-      "title": "K-컬처 스크린(대한민국역사박물관)",
-      "zipcode": "03141",
-      "lDongRegnCd": "11",
-      "lDongSignguCd": "110",
-      "lclsSystm1": "EX",
-      "lclsSystm2": "EX07",
-      "lclsSystm3": "EX070200"
-     },
-     {
       "addr1": "서울특별시 종로구 북촌로11가길 16 (가회동)",
       "addr2": "",
       "areacode": "",
@@ -17174,33 +17147,6 @@
       "lclsSystm1": "NA",
       "lclsSystm2": "NA05",
       "lclsSystm3": "NA050100"
-     },
-     {
-      "addr1": "서울특별시 종로구 창의문로11길 4-1 (부암동)",
-      "addr2": "",
-      "areacode": "1",
-      "cat1": "A02",
-      "cat2": "A0201",
-      "cat3": "A02011000",
-      "contentid": "3449598",
-      "contenttypeid": "12",
-      "createdtime": "20241218152258",
-      "firstimage": "http://tong.visitkorea.or.kr/cms/resource/32/3449432_image2_1.JPG",
-      "firstimage2": "http://tong.visitkorea.or.kr/cms/resource/32/3449432_image3_1.JPG",
-      "cpyrhtDivCd": "Type1",
-      "mapx": "126.9627744300",
-      "mapy": "37.5948701151",
-      "mlevel": "6",
-      "modifiedtime": "20250107100457",
-      "sigungucode": "23",
-      "tel": "",
-      "title": "석파정",
-      "zipcode": "03021",
-      "lDongRegnCd": "11",
-      "lDongSignguCd": "110",
-      "lclsSystm1": "HS",
-      "lclsSystm2": "HS04",
-      "lclsSystm3": "HS040400"
      },
      {
       "addr1": "서울특별시 관악구 낙성대로 77 (봉천동)",
@@ -33509,33 +33455,6 @@
       "lclsSystm1": "VE",
       "lclsSystm2": "VE07",
       "lclsSystm3": "VE070300"
-     },
-     {
-      "addr1": "서울특별시 종로구 삼청로7길 38",
-      "addr2": "",
-      "areacode": "1",
-      "cat1": "A02",
-      "cat2": "A0206",
-      "cat3": "A02060500",
-      "contentid": "3106658",
-      "contenttypeid": "14",
-      "createdtime": "20240227183458",
-      "firstimage": "http://tong.visitkorea.or.kr/cms/resource/86/3095786_image2_1.jpg",
-      "firstimage2": "http://tong.visitkorea.or.kr/cms/resource/86/3095786_image3_1.jpg",
-      "cpyrhtDivCd": "Type1",
-      "mapx": "126.9796815273",
-      "mapy": "37.5840827831",
-      "mlevel": "6",
-      "modifiedtime": "20250826174203",
-      "sigungucode": "23",
-      "tel": "",
-      "title": "[K드라마 촬영지] 공근혜갤러리",
-      "zipcode": "03049",
-      "lDongRegnCd": "11",
-      "lDongSignguCd": "110",
-      "lclsSystm1": "VE",
-      "lclsSystm2": "VE07",
-      "lclsSystm3": "VE070600"
      },
      {
       "addr1": "서울특별시 종로구 대학로10길 8 (동숭동)",
@@ -92993,7 +92912,7 @@
      }
     ]
    },
-   "totalCount": 3444
+   "totalCount": 3441
   }
  }
 }

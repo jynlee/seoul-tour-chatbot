@@ -183,10 +183,11 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
 _WHOLE_SEOUL = re.compile(r"서울(?=$|[\s?!.,]|에서|에|의|은|는|을|이|가|도|전체|시내|안|곳곳)")
 # "카페는?"·"공원은?"처럼 말 하나에 '은/는'만 붙인 이어 묻기
 _SHORT_FOLLOW_UP = re.compile(r"^\s*[가-힣A-Za-z]{1,8}\s*(?:은|는)\s*[?？]?\s*$")
-# "그럼 산책할 곳은?"·"또 박물관은?" — 연결어 + 짧은 '○○은/는?' 이어 묻기 (리드 결정 QA-11)
-_CONNECTIVE_FOLLOW_UP = re.compile(r"^\s*(?:그럼|그러면|그리고|또)\s+[가-힣A-Za-z ]{1,12}?\s*(?:은|는)\s*[?？]?\s*$")
-# "이 근처 박물관도 있어?"·"주변에 야경 명소는?"·"이 동네 맛집" — 지금 보고 있는 곳 근처라는 말 (QA-11)
-_NEAR_HERE = ("근처", "주변", "인근", "가까운", "이 동네", "이동네", "여기", "이곳")
+# "그럼 산책할 곳은?"·"또 공원 있어?" — 연결어 + 짧은 이어 묻기 (리드 결정 QA-11)
+_CONNECTIVE_FOLLOW_UP = re.compile(r"^\s*(?:그럼|그러면|그리고|또)\s+\S.{0,14}$")
+# "이 근처 박물관도 있어?"·"주변에 야경 명소는?"·"이 동네 맛집" — 지금 보고 있는 곳 근처라는 말 (QA-11).
+# '근처/주변'은 질문 맨 앞일 때만 — "한강 근처 야경"처럼 다른 곳을 직접 말한 건 새 질문 (QA-12)
+_NEAR_HERE = re.compile(r"^\s*(?:근처|주변|인근|가까운)|이\s*(?:근처|주변|근방|동네)|이동네|여기|이곳")
 
 
 def wants_whole_seoul(message: str) -> bool:
@@ -196,7 +197,7 @@ def wants_whole_seoul(message: str) -> bool:
     if _WHOLE_SEOUL.search(message):
         return True
     if (is_more_request(message) or has_demonstrative(message) or _SHORT_FOLLOW_UP.match(message)
-            or _CONNECTIVE_FOLLOW_UP.match(message) or _has(message, _NEAR_HERE)):
+            or _CONNECTIVE_FOLLOW_UP.match(message) or _NEAR_HERE.search(message)):
         return False
     return detect_intent(message).topic is not None  # 맛집·카페 질문은 주제 없음
 

@@ -88,6 +88,9 @@ def test_title_aliases_heritage_style():
     assert title_aliases("[서울둘레길 3코스] 불암산코스") == ["[서울둘레길 3코스] 불암산코스", "불암산코스"]
     assert title_aliases("동촌 보리밥과 돈까스") == ["동촌 보리밥과 돈까스"]  # 첫 낱말이 '과/와'로 끝날 때만
     assert title_aliases("서울") == ["서울"]
+    # QA-10b: '○○&○○' → 앞 이름 (3글자 이상만: 'KT&G'의 'KT'는 아님)
+    assert title_aliases("롯데월드타워&롯데월드몰") == ["롯데월드타워&롯데월드몰", "롯데월드타워"]
+    assert title_aliases("KT&G 상상마당 홍대") == ["KT&G 상상마당 홍대"]
 
 
 @pytest.fixture(scope="module")

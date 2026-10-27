@@ -72,3 +72,10 @@ def test_catalog_loads_overview(tmp_path):
         {"contentid": "126512", "contenttypeid": "12", "title": "광화문", "cat2": "A0201", "cat3": "A02010300"}]}}}}),
         encoding="utf-8")
     assert load_catalog(raw, enriched)["126512"].overview == "광화문 설명"
+
+
+def test_build_query_with_near_adds_geo_distance_filter():
+    # 품질 ①: 반경 기준 추천은 반경 안에서 kNN (lucene 엔진 efficient filtering)
+    q = build_query([0.1] * 768, {"39"}, None, 100, near=(37.5690, 126.9780, 1500))
+    assert {"geo_distance": {"distance": "1500m", "location": {"lat": 37.5690, "lon": 126.9780}}} in _filters(q)
+    assert {"terms": {"content_type": ["39"]}} in _filters(q)
