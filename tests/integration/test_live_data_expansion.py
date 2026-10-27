@@ -2,7 +2,7 @@
 
 실행: OPENSEARCH_INDEX=seoul-tour-v3 pytest -m integration tests/integration/test_live_data_expansion.py
 LLM은 가짜(답 문구는 안 봄). 대화 기록은 `test-qa-` 세션만 쓰고 끝나면 지운다.
-xfail(strict) = 리드가 data에게 맡긴 문제(①만 남음, ②는 0c2f9d3에서 고침). 고쳐지면 XPASS로 실패하니 xfail 표시를 지울 것.
+②는 0c2f9d3, ①은 02fee94(반경 안 kNN + 가장 가까운 곳 포함)에서 고쳐져 xfail을 지움 — 이제 회귀 테스트.
 """
 import dataclasses
 
@@ -37,7 +37,6 @@ def say(live, message):
 
 
 # ① 반경 안 가장 가까운 곳이 kNN 상위 100곳 밖이면 빠짐 (청계천 84m 더 우리곱창 = kNN 261위, 1번은 890m 카페 빠우)
-@pytest.mark.xfail(strict=True, reason="품질 ①: 반경 안 가까운 곳 누락 (app/recommend.py _recommend, CANDIDATES_K)")
 def test_live_q1_nearest_food_included(live):
     _client, deps, _s = live
     r = say(live, "청계천 근처 맛집 추천해줘")
@@ -49,7 +48,6 @@ def test_live_q1_nearest_food_included(live):
 
 
 # ① 같은 원인: "남산 관광지"에 남산서울타워(32m, kNN 10위)가 5곳 밖
-@pytest.mark.xfail(strict=True, reason="품질 ①: '남산 관광지'에 남산서울타워 없음")
 def test_live_q1_namsan_tower(live):
     r = say(live, "남산 관광지")
     assert r["center"]["label"] == "남산"
