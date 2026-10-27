@@ -1,4 +1,4 @@
-"""Q1 통합: 실제 OpenSearch(seoul-tour-v2)·Ollama(gemma4:e4b)·MySQL(chat_message)에 붙는 API 테스트.
+"""Q1 통합: 실제 OpenSearch(seoul-tour-v3)·Ollama(gemma4:e4b)·MySQL(chat_message)에 붙는 API 테스트.
 
 실행: pytest -m integration -v  (worktree 루트에 .env 필요)
 대화 기록은 `test-qa-` 접두 세션만 쓰고 끝나면 지운다. 다른 인덱스·테이블은 건드리지 않는다.
