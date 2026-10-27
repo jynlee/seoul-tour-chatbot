@@ -54,3 +54,22 @@ def test_catalog_loads_detail(tmp_path):
     catalog = load_catalog("data/seoul_tour.json", enriched)
     assert catalog["398373"].detail == {"parking": "불가능"}
     assert catalog["126512"].detail == {}
+
+
+def test_main_skips_places_with_detail_elsewhere(tmp_path, monkeypatch):
+    import scripts.enrich_detail as ed
+
+    raw = tmp_path / "raw.json"
+    raw.write_text(json.dumps({"response": {"body": {"items": {"item": [
+        {"contentid": "1", "contenttypeid": "39", "title": "기존"},
+        {"contentid": "2", "contenttypeid": "12", "title": "새 장소"},
+    ]}}}}), encoding="utf-8")
+    skip = tmp_path / "enriched.json"
+    skip.write_text(json.dumps({"1": {"tel": "02", "detail": {"parking": "가능"}}}), encoding="utf-8")
+    out = tmp_path / "detail.json"
+    monkeypatch.setenv("TOUR_API_KEY", "KEY")
+    called = []
+    monkeypatch.setattr(ed, "fetch_detail", lambda key, cid, ct: called.append(cid) or {"hours": "09:00"})
+    assert ed.main(["--raw", str(raw), "--out", str(out), "--skip-from", str(skip), "--sleep", "0"]) == 0
+    assert called == ["2"]
+    assert json.loads(out.read_text(encoding="utf-8")) == {"2": {"detail": {"hours": "09:00"}}}
