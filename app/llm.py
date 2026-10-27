@@ -17,10 +17,10 @@ class LLM(Protocol):
 NEAR_RADIUS_M = 1500
 
 
-def _place_line(i: int, p: PlaceOut, mark_far: bool = True, gu: str | None = None) -> str:
+def _place_line(i: int, p: PlaceOut, mark_far: bool = True, gu: str | None = None, center_gu: str | None = None) -> str:
     line = f"{i}. 이름: {p.title} / 분류: {p.category} / 주소: {p.addr}"
     if gu:
-        line += f" / 구: {gu}"
+        line += f" / 구: {gu}" + (f" ({center_gu} 밖의 다른 구)" if center_gu and gu != center_gu else "")
     if mark_far and p.walk_min is not None:
         line += f" / 도보 {p.walk_min}분"
     if mark_far and p.distance_m is not None and p.distance_m > NEAR_RADIUS_M:
@@ -56,7 +56,7 @@ def build_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
     """
     place_gus = place_gus or {}
     history = "\n".join(history_texts[-HISTORY_LIMIT:]) or "(없음)"
-    place_text = "\n".join(_place_line(i, p, mark_far=not gu_wide, gu=place_gus.get(p.id))
+    place_text = "\n".join(_place_line(i, p, mark_far=not gu_wide, gu=place_gus.get(p.id), center_gu=center_label)
                            for i, p in enumerate(places, 1)) or "(없음)"
     outside = {place_gus[p.id] for p in places if p.id in place_gus and place_gus[p.id] != center_label}
     rules = [
