@@ -4,7 +4,9 @@
 1. 장소 정보 질문(place_info): 정보 키워드(주차·영업…)가 있거나, 순서·이름으로 장소를 가리키며 설명을 물을 때.
    단 "근처/주변/가까운/추천" 또는 "다른 데 더"가 있으면 추천이 우선. places=[], center=null (지도 유지).
 2. 일상 대화(casual): 고정 답변, places=[].
-3. 추천: 빠진 카테고리는 직전 추천에서 이어받고, 가리킨 장소가 있으면 그곳이 기준점.
+3. 추천 코스: 코스 말·데이트 말이면 칸 순서대로 걸어서 이어지는 장소들. 직전 답이 코스인데 "다른 코스"면
+   그 코스를 만든 질문으로 다시 짜되 같은 기준점에서 보여 준 코스 장소는 뺀다. 못 짜면 일반 추천에 안내 문장을 붙인다.
+4. 추천: 빠진 카테고리는 직전 추천에서 이어받고, 가리킨 장소가 있으면 그곳이 기준점.
    "다른 데 더"는 같은 기준점에서 이미 보여 준 곳을 빼고 다음 후보.
 """
 import logging
@@ -14,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.center import Center, has_named_area, resolve_center
+from app.course import COURSE_WORDS, build_course, plan_course
 from app.dialog import (
     asked_fields, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
     intent_from_places, is_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference, wants_whole_seoul,
@@ -21,9 +24,10 @@ from app.dialog import (
 from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE
 from app.intent import CASUAL_RESPONSES, TOUR_TOPICS, TOUR_TYPES, detect_intent
 from app.llm import (
-    CLARIFY_ANSWER, FAR_MORE_NOTICE, GU_EMPTY_MORE_NOTICE, GU_EMPTY_NOTICE, GU_FILL_MORE_NOTICE, GU_FILL_NOTICE,
-    NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE, LLMUnavailable, all_far, build_info_prompt,
-    build_prompt, info_template_answer, mentions_far, mentions_missing, mentions_other_gu, template_answer,
+    CLARIFY_ANSWER, COURSE_FAIL_NOTICE, COURSE_HOURS_NOTE, FAR_MORE_NOTICE, GU_EMPTY_MORE_NOTICE, GU_EMPTY_NOTICE,
+    GU_FILL_MORE_NOTICE, GU_FILL_NOTICE, NO_MORE_ANSWER, ORDINAL_OUT_OF_RANGE, TOPIC_MISSING_NOTICE, LLMUnavailable,
+    all_far, build_course_prompt, build_info_prompt, build_prompt, course_template_answer, dropped_notice,
+    info_template_answer, mentions_far, mentions_missing, mentions_other_gu, template_answer,
 )
 from app.recommend import recommend
 from app.schemas import CenterOut, ChatRequest, ChatResponse
@@ -57,11 +61,12 @@ class ChatService:
             log.exception("대화 기록 조회 실패 (session=%s)", sid)
             return [], None
 
-    def _reply(self, sid, user_message, answer, center=None, places=None, saved_center=None) -> ChatResponse:
+    def _reply(self, sid, user_message, answer, center=None, places=None, saved_center=None,
+               course: bool = False) -> ChatResponse:
         places = places or []
         self._save(sid, "user", user_message)
         self._save(sid, "assistant", answer, center=saved_center or center, places=places)
-        return ChatResponse(session_id=sid, answer=answer, center=center, places=places)
+        return ChatResponse(session_id=sid, answer=answer, center=center, places=places, course=course)
 
     def handle(self, req: ChatRequest) -> ChatResponse:
         sid = req.session_id or str(uuid.uuid4())
@@ -98,22 +103,39 @@ class ChatService:
         if intent.casual and ref is None:
             return self._reply(sid, msg, random.choice(CASUAL_RESPONSES))
 
-        # 3) 추천
+        # 3) 추천 코스 ("다른 코스"는 코스 말이 있어도 새 코스 질문보다 먼저 판정)
+        course_more = self._is_course_more(msg, more, last_places)
+        course_q = self._last_course_question(messages) if course_more else msg
+        plan = plan_course(course_q) if course_q else None
+        if plan is not None:
+            center = self._center(msg, req, ref, last, last_places, catalog)
+            return self._course(sid, msg, course_q, plan, center, course_more, messages, history_texts)
+
+        # 4) 추천
         if not intent.has_category and last_places:
             intent = intent_from_places(last_places, catalog) or intent
             # "다른 데 더"·"거기 근처는?"도 직전 관광 세부 주제(산책 등)를 이어받음
             if intent.content_types and intent.content_types <= TOUR_TYPES | {EVENT_TYPE}:
                 intent.topic = self._last_topic(messages)
-        if req.location is None and ref is not None and not has_named_area(msg, catalog):
-            p = ref.place
-            center = Center(lat=p.lat, lng=p.lng, label=p.title, source="place", place_id=p.id)
-        else:
-            # '서울에서…'·주제만 묻는 새 질문은 직전 기준점을 이어받지 않음 (지역·장소 이름이 있으면 그것대로)
-            last_center = last.center if last and not wants_whole_seoul(msg) else None
-            center = resolve_center(msg, req.location, req.selected_place_id, last_places, last_center, catalog)
+        center = self._center(msg, req, ref, last, last_places, catalog)
         label = center.label if center else None
         exclude = self._shown_ids(messages, label) if more else set()
+        return self._recommend(sid, msg, intent, center, more, exclude, history_texts)
 
+    @staticmethod
+    def _center(msg, req, ref, last, last_places, catalog) -> Center | None:
+        """기준점: 가리킨 장소가 있으면 그곳, 아니면 resolve_center (코스·일반 추천이 같이 씀)."""
+        if req.location is None and ref is not None and not has_named_area(msg, catalog):
+            p = ref.place
+            return Center(lat=p.lat, lng=p.lng, label=p.title, source="place", place_id=p.id)
+        # '서울에서…'·주제만 묻는 새 질문은 직전 기준점을 이어받지 않음 (지역·장소 이름이 있으면 그것대로)
+        last_center = last.center if last and not wants_whole_seoul(msg) else None
+        return resolve_center(msg, req.location, req.selected_place_id, last_places, last_center, catalog)
+
+    def _recommend(self, sid, msg, intent, center, more, exclude, history_texts, prefix=None) -> ChatResponse:
+        """일반 추천 답. prefix가 있으면 답 맨 앞에 붙인다 (코스 실패 안내)."""
+        catalog = self.deps.catalog
+        label = center.label if center else None
         # SearchUnavailable 은 그대로 올린다 (API에서 503)
         rec = recommend(msg, intent, center, self.deps.searcher, self.deps.embedder, catalog, exclude_ids=exclude)
         center_out = center.to_out() if center else None
@@ -152,7 +174,80 @@ class ChatService:
                 answer = f"{missing_notice} {answer}"
             if gu_notice:
                 answer = f"{gu_notice} {answer}"
+        if prefix:
+            answer = f"{prefix} {answer}"
         return self._reply(sid, msg, answer, center=center_out, places=rec.places)
+
+    def _course(self, sid, msg, course_q, plan, center, more, messages, history_texts) -> ChatResponse:
+        """코스 답. 못 짜면(3곳 미만) 그 질문으로 일반 관광 추천을 하고 코스를 못 짰다는 사실을 앞에 밝힌다."""
+        label = center.label if center else None
+        exclude = self._shown_course_ids(messages, label) if more else set()
+        # SearchUnavailable 은 그대로 올린다 (API에서 503)
+        result = build_course(course_q, plan, center, self.deps.searcher, self.deps.embedder, self.deps.catalog,
+                              exclude_ids=exclude)
+        if not result.ok:
+            if more and not result.places:
+                return self._reply(sid, msg, NO_MORE_ANSWER.format(label=f"{label} 근처" if label else "이"))
+            intent = detect_intent(course_q)
+            if not intent.has_category:
+                intent.content_types = set(TOUR_TYPES)
+            if center is None:
+                where = ""
+            elif center.source in ("place", "gps"):
+                where = f"{label} 근처에서는 "
+            else:
+                where = f"{label}에서는 "  # 구·지역 이름: "성동구에서는", "홍대에서는"
+            return self._recommend(sid, msg, intent, center, more, exclude, history_texts,
+                                   prefix=COURSE_FAIL_NOTICE.format(where=where))
+
+        notice = dropped_notice(result.dropped)
+        try:
+            answer = self.deps.llm.generate(
+                build_course_prompt(msg, history_texts, result.places, label, result.dropped))
+        except LLMUnavailable:
+            answer = course_template_answer(result.places)
+        # 뺀 칸 안내·영업시간 안내는 LLM이 빠뜨려도 꼭 들어가게
+        if notice and notice not in answer:
+            answer = f"{notice} {answer}"
+        if COURSE_HOURS_NOTE not in answer:
+            answer = f"{answer} {COURSE_HOURS_NOTE}"
+        center_out = center.to_out() if center else None
+        return self._reply(sid, msg, answer, center=center_out, places=result.places, course=True)
+
+    @staticmethod
+    def _is_course_more(msg, more, last_places) -> bool:
+        """직전 답이 코스인데 "다른 데 더"·"다른 코스"·"또 코스"처럼 물었는지."""
+        if not last_places or last_places[0].step is None:
+            return False
+        return more or ChatService._asks_other_course(msg)
+
+    @staticmethod
+    def _asks_other_course(msg) -> bool:
+        return ("다른" in msg or "또" in msg) and any(w in msg for w in COURSE_WORDS)
+
+    @classmethod
+    def _last_course_question(cls, messages) -> str | None:
+        """마지막 코스 답을 만든 처음 질문 ("다른 코스"를 거듭 물었으면 그 앞의 코스 질문까지 거슬러 감)."""
+        for i in range(len(messages) - 1, 0, -1):
+            m = messages[i]
+            if m.role == "assistant" and m.places and m.places[0].step is not None:
+                prev = messages[i - 1]
+                if prev.role != "user":
+                    return None
+                if is_more_request(prev.message) or cls._asks_other_course(prev.message):
+                    continue  # 이 코스도 "다른 코스"로 나온 것 → 더 앞의 코스 답으로
+                return prev.message
+        return None
+
+    @staticmethod
+    def _shown_course_ids(messages, label) -> set[str]:
+        """같은 기준점에서 이미 보여 준 코스 장소 ("다른 코스"에서 뺄 곳)."""
+        shown = set()
+        for m in messages:
+            if (m.role == "assistant" and m.places and m.places[0].step is not None
+                    and (m.center.label if m.center else None) == label):
+                shown.update(p.id for p in m.places)
+        return shown
 
     @staticmethod
     def _what(intent) -> tuple[str, str]:
