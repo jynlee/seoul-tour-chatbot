@@ -2,10 +2,15 @@
 import re
 from dataclasses import dataclass
 
-from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE
+from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE, Place, has_coords
+from app.center import Center
+from app.geo import haversine_m, walk_min
 from app.intent import (
     CAFE_KEYWORDS, FESTIVAL_KEYWORDS, FOOD_KEYWORDS, TOUR_TOPICS, TOUR_TYPES, has_word,
+    matches_topic, title_has_topic_word, topic_words,
 )
+from app.recommend import CANDIDATES_K, CENTER_GROUP_RADIUS_M, _gu_of_center, group_key, one_per_group, to_place_out
+from app.schemas import PlaceOut
 
 COURSE_WORDS = ("코스", "동선", "루트", "일정 짜", "하루 일정", "순서대로")
 DATE_WORDS = ("데이트", "기념일", "연인", "여자친구", "남자친구")
@@ -139,3 +144,109 @@ def plan_course(message: str) -> CoursePlan | None:
 
 def is_course_question(message: str) -> bool:
     return plan_course(message) is not None
+
+
+NEXT_RADIUS_M = 800        # 다음 칸은 직전 장소에서 이만큼 안
+WIDE_RADIUS_M = 1500       # 800m 안에 없을 때(첫 칸의 기준점 반경도 이 값)
+MAX_TOTAL_WALK_M = 3000    # 칸 사이 걷는 거리 합
+MIN_STOPS = 3
+
+
+@dataclass
+class CourseResult:
+    places: list[PlaceOut]  # step·leg_m·leg_walk_min 채움, 코스 순서
+    dropped: list[str]      # 답에서 안내할 빠진 칸 이름 (quiet_drop 칸 제외)
+    ok: bool                # len(places) >= MIN_STOPS
+
+
+def build_course(message: str, plan: CoursePlan, center: Center | None, searcher, embedder,
+                 catalog: dict[str, Place], exclude_ids: set[str] | frozenset = frozenset()) -> CourseResult:
+    """칸 계획대로 장소를 고른다: 첫 칸은 기준점 근처, 다음 칸은 직전 장소 800m → 1.5km 안, 없으면 그 칸을 뺀다."""
+    skip = set(exclude_ids)
+    center_place = catalog.get(center.place_id) if center is not None and getattr(center, "place_id", None) else None
+    if center_place is not None:
+        skip.add(center_place.id)
+    center_key = group_key(center_place.title) if center_place is not None and center_place.kind != "food" else None
+    gu = _gu_of_center(center)
+
+    def part_of_center(p: Place) -> bool:
+        # recommend 와 같은 규칙: 종류가 같은 세부 장소만 (이름만 빌린 별개 장소는 남김)
+        return (center_key is not None and p.content_type == center_place.content_type
+                and group_key(p.title) == center_key
+                and haversine_m(center_place.lat, center_place.lng, p.lat, p.lng) <= CENTER_GROUP_RADIUS_M)
+
+    chosen: list[Place] = []
+    out: list[PlaceOut] = []
+    dropped: list[str] = []
+    walked = 0.0  # 칸 사이 걸은 거리 합
+
+    for step in plan.steps:
+        prev = chosen[-1] if chosen else None
+        text = f"{message} 전시 산책 볼거리" if step.label == "볼거리" else f"{message} {step.label}"
+        vector = embedder.encode(text)
+        words = topic_words(message, step.topic)
+
+        def boost(p: Place) -> int:
+            return (2 if title_has_topic_word(p.title, words, step.topic) else 0) +                    (1 if matches_topic(p.category, p.title, step.topic) else 0)
+
+        def usable(p: Place) -> bool:
+            if p.id in skip or not has_coords(p) or p.id in {c.id for c in chosen}:
+                return False
+            if step.exclude_cat3 and p.cat3 == step.exclude_cat3:
+                return False
+            if part_of_center(p):
+                return False
+            if step.required_topic and not matches_topic(p.category, p.title, step.topic):
+                return False
+            return len(one_per_group(chosen + [p])) == len(chosen) + 1
+
+        def candidates(near) -> list[Place]:
+            hits = searcher.knn(vector, step.content_types, step.cat3, CANDIDATES_K, near=near)
+            found, seen = [], set()
+            for pid, _score in hits:
+                p = catalog.get(pid)
+                if p is None or pid in seen or not usable(p):
+                    continue
+                seen.add(pid)
+                found.append(p)
+            found.sort(key=lambda p: -boost(p))  # 안정 정렬: 주제 맞는 곳 먼저, 그 안에서는 관련도순
+            return found
+
+        pick = None
+        if prev is None:
+            # 첫 칸(앞 칸이 빠졌어도 아직 못 골랐으면 같은 규칙): 구는 near 없이 그 구 안, 반경형은 1.5km, 기준점 없음은 서울 전체
+            if gu is not None:
+                found = [p for p in candidates(None) if p.gu == gu]
+            elif center is not None:
+                found = candidates((center.lat, center.lng, WIDE_RADIUS_M))
+            else:
+                found = candidates(None)
+            pick = found[0] if found else None
+            leg = (haversine_m(center.lat, center.lng, pick.lat, pick.lng)
+                   if pick is not None and center is not None and gu is None else None)
+        else:
+            leg = None
+            for radius in (NEXT_RADIUS_M, WIDE_RADIUS_M):
+                for p in candidates((prev.lat, prev.lng, radius)):
+                    d = haversine_m(prev.lat, prev.lng, p.lat, p.lng)
+                    if walked + d <= MAX_TOTAL_WALK_M:
+                        pick, leg = p, d
+                        break
+                if pick is not None:
+                    break
+            if pick is not None:
+                walked += leg
+
+        if pick is None:
+            if not step.quiet_drop:
+                dropped.append(step.label)
+            continue
+        chosen.append(pick)
+        po = to_place_out(pick)
+        po.step = step.label
+        if leg is not None:
+            po.leg_m = int(round(leg))
+            po.leg_walk_min = walk_min(po.leg_m)
+        out.append(po)
+
+    return CourseResult(places=out, dropped=dropped, ok=len(out) >= MIN_STOPS)
