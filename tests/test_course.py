@@ -197,6 +197,15 @@ def test_no_same_group_twice():
     assert "다른 전시관" in titles
 
 
+def test_food_places_with_same_first_word_both_kept():
+    # 음식점끼리는 묶음 검사를 하지 않는다: "인사동 한정식"과 "인사동 찻집"은 별개 가게 (Ruling 6)
+    ps = [_sight("s1", "한옥전시관", 0.0), _food("f1", "인사동 한정식", 0.002), _cafe("c1", "인사동 찻집", 0.0038)]
+    r = _build(ps)
+    titles = [p.title for p in r.places]
+    assert _dist(*[next(p for p in ps if p.title == t) for t in ("인사동 한정식", "인사동 찻집")]) <= 250
+    assert r.ok and titles == ["한옥전시관", "인사동 한정식", "인사동 찻집"]
+
+
 def test_legs():
     r = _build(_basic())
     first = r.places[0]

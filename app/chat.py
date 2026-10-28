@@ -15,7 +15,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from app.center import Center, has_named_area, resolve_center
+from app.center import Center, has_named_area, match_place, resolve_center
 from app.course import COURSE_WORDS, build_course, plan_course
 from app.dialog import (
     asked_fields, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
@@ -214,30 +214,31 @@ class ChatService:
         center_out = center.to_out() if center else None
         return self._reply(sid, msg, answer, center=center_out, places=result.places, course=True)
 
-    @staticmethod
-    def _is_course_more(msg, more, last_places) -> bool:
-        """직전 답이 코스인데 "다른 데 더"·"다른 코스"·"또 코스"처럼 물었는지."""
+    def _is_course_more(self, msg, more, last_places) -> bool:
+        """직전 답이 코스인데 "다른 데 더"·"다른 코스"·"또 코스"처럼 물었는지.
+        스스로 칸 계획(데이트·맛집·카페…)이 있거나 장소·지역 이름이 있으면 새 코스 질문이다 (Ruling 7)."""
         if not last_places or last_places[0].step is None:
             return False
-        return more or ChatService._asks_other_course(msg)
+        if not (more or (("다른" in msg or "또" in msg) and any(w in msg for w in COURSE_WORDS))):
+            return False
+        own = plan_course(msg)
+        if own is not None and own.theme != "default":
+            return False
+        return not has_named_area(msg, self.deps.catalog) and match_place(msg, self.deps.catalog) is None
 
-    @staticmethod
-    def _asks_other_course(msg) -> bool:
-        return ("다른" in msg or "또" in msg) and any(w in msg for w in COURSE_WORDS)
-
-    @classmethod
-    def _last_course_question(cls, messages) -> str | None:
-        """마지막 코스 답을 만든 처음 질문 ("다른 코스"를 거듭 물었으면 그 앞의 코스 질문까지 거슬러 감)."""
-        for i in range(len(messages) - 1, 0, -1):
-            m = messages[i]
-            if m.role == "assistant" and m.places and m.places[0].step is not None:
-                prev = messages[i - 1]
-                if prev.role != "user":
-                    return None
-                if is_more_request(prev.message) or cls._asks_other_course(prev.message):
-                    continue  # 이 코스도 "다른 코스"로 나온 것 → 더 앞의 코스 답으로
-                return prev.message
-        return None
+    def _last_course_question(self, messages) -> str | None:
+        """마지막 코스를 만든 처음 질문: 코스 답을 받았고 그 자신은 "다른 코스"가 아니었던 마지막 사용자 질문."""
+        origin = None
+        prev_places = []  # 그 질문 때의 직전 추천 (handle 의 last_places 와 같음)
+        for i, m in enumerate(messages):
+            if m.role == "user" and i + 1 < len(messages):
+                bot = messages[i + 1]
+                got_course = bot.role == "assistant" and bot.places and bot.places[0].step is not None
+                if got_course and not self._is_course_more(m.message, is_more_request(m.message), prev_places):
+                    origin = m.message
+            if m.role == "assistant" and m.places:
+                prev_places = m.places
+        return origin
 
     @staticmethod
     def _shown_course_ids(messages, label) -> set[str]:

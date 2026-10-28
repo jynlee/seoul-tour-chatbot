@@ -108,6 +108,33 @@ def test_more_course_twice_keeps_first_question(client):
     assert not shown & {p["id"] for p in third["places"]}
 
 
+def test_own_plan_after_course_is_new_course(client):
+    # 코스 말과 '또'가 있어도 스스로 칸 계획(맛집·카페)이 있으면 "다른 코스"가 아니라 새 코스 질문 (Ruling 7)
+    say(client, "종로 데이트 추천해줘", "test-course-12")
+    data = say(client, "종로 맛집 카페 코스 또 짜줘", "test-course-12")
+    assert data["course"] is True
+    assert [p["step"] for p in data["places"]] == ["관광지", "맛집", "카페"]
+
+
+def test_named_place_after_course_is_new_course(client):
+    # 장소·지역 이름이 있으면 "다른 코스"여도 그곳 기준 새 코스 질문 (Ruling 7)
+    say(client, "종로 데이트 추천해줘", "test-course-13")
+    first = say(client, "가회동 다른 코스", "test-course-13")  # 직전 데이트 코스를 이어 짜지 않고 기본 코스
+    assert first["center"]["label"] == "가회동"
+    assert first["course"] is True
+    assert first["places"][0]["step"] == "관광지"
+
+
+def test_more_course_after_question_with_other_word(client):
+    # 처음 질문에 '다른'+코스 말이 있어도("다른 데이트 코스") 그 질문이 코스를 만든 처음 질문이다
+    first = say(client, "종로에서 다른 데이트 코스 짜줘", "test-course-14")
+    assert first["course"] is True
+    data = say(client, "다른 코스", "test-course-14")
+    assert data["course"] is True
+    assert data["places"][0]["step"] == "볼거리"
+    assert not {p["id"] for p in first["places"]} & {p["id"] for p in data["places"]}
+
+
 def test_more_course_exhausted():
     client, _ = _client({p.id: p for p in ONE_COURSE})
     first = say(client, "종로 데이트 추천해줘", "test-course-5")

@@ -198,7 +198,9 @@ def build_course(message: str, plan: CoursePlan, center: Center | None, searcher
                 return False
             if step.required_topic and not matches_topic(p.category, p.title, step.topic):
                 return False
-            return len(one_per_group(chosen + [p])) == len(chosen) + 1
+            # 묶음(큰 관광지의 세부 시설) 검사는 음식점끼리는 하지 않는다: "인사동 한정식"·"인사동 찻집"은 별개 가게
+            pool = [c for c in chosen if c.kind != "food"] if p.kind == "food" else chosen
+            return len(one_per_group(pool + [p])) == len(pool) + 1
 
         def candidates(near, extra=()) -> list[Place]:
             hits = searcher.knn(vector, step.content_types, step.cat3, CANDIDATES_K, near=near)
