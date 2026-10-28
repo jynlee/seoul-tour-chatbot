@@ -20,7 +20,7 @@ MAX_STEPS = 4
 MIN_STEPS = 3
 _HANGUL = re.compile(r"[가-힣]")
 # 걷기 코스 이름('[종로둘레길 3코스] 낙산 코스')은 코스의 한 칸(장소)이 아님
-_WALK_COURSE_TITLE = re.compile(r"둘레길|코스\s*$")
+_WALK_COURSE_TITLE = re.compile(r"둘레길|코스\s*$|관광특구")  # 관광특구는 지역 묶음
 
 SIGHT_TYPES = frozenset({"12", "14"})
 # 관광 주제 → 칸 이름 (야경은 별도 칸 정의)
@@ -59,11 +59,13 @@ NIGHT = Step("야경", frozenset(TOUR_TYPES), topic="night", required_topic=True
 FESTIVAL = Step("축제", frozenset({EVENT_TYPE}))
 
 
+# 코스 야경 칸 전용 제목 검사 (intent 의 night 패턴은 추천용이라 그대로 둠, Ruling 8·10)
+_NIGHT_OK = re.compile(r"(?:대교|다리)(?=$|[\s(])|타워|전망|루프탑|야경|분수|스카이|한강공원|물빛광장")
+_NIGHT_NO = re.compile(r"수영장|물놀이|교당|성당|교회|사찰|도서관|(?<![가-힣])절(?![가-힣])")
+
+
 def _night_title(p: Place, step: Step) -> bool:
-    t = TOUR_TOPICS[step.topic]
-    if t.exclude_pattern and re.search(t.exclude_pattern, p.title):
-        return False
-    return re.search(t.title_pattern, p.title) is not None
+    return _NIGHT_OK.search(p.title) is not None and _NIGHT_NO.search(p.title) is None
 
 
 def _topic_step(key: str) -> Step:

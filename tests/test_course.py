@@ -290,3 +290,21 @@ def test_area_like_title_place_excluded_from_all_steps():
 def test_walking_course_titles_excluded_from_sight_steps(title):
     r = _build(_basic() + [_sight("w", title, 0.0005)])
     assert "w" not in [p.id for p in r.places]
+
+
+# ---- Ruling 10: 야경 제목 검사·관광특구 ----
+@pytest.mark.parametrize("title", ["천도교 중앙대교당", "한강시민공원 여의도수영장(실외)", "성당 야경길", "망원 도서관 전망"])
+def test_night_title_rejected(title):
+    r = _build(_basic()[:3] + [_night("x", title, 0.005)])
+    assert "야경" not in [p.step for p in r.places]
+
+
+@pytest.mark.parametrize("title", ["반포대교 달빛무지개분수", "N서울타워", "여의도 물빛광장", "성수대교", "행복다리 (보행교)"])
+def test_night_title_accepted(title):
+    r = _build(_basic()[:3] + [_night("x", title, 0.005)])
+    assert [p.id for p in r.places if p.step == "야경"] == ["x"]
+
+
+def test_tourism_zone_title_excluded_from_sight_steps():
+    r = _build(_basic() + [_sight("z", "종로 청계 관광특구", 0.0005)])
+    assert "z" not in [p.id for p in r.places]
