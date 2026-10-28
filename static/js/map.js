@@ -241,6 +241,7 @@ export function pickLandmarks(cands, pins, { width = MAP_W, height = MAP_H } = {
 export function renderMap(el, { center = null, places = [], me = null, selectedId = null, onPinClick } = {}) {
   const W = MAP_W, H = MAP_H;
   const shown = places.filter(valid);
+  const course = places.some((p) => p.step); // 추천 코스: 번호 핀 + 순서 점선
   // 기준점 가까이(900m 안)에 6대 랜드마크가 있으면 지도 범위에 넣어서 미니 일러스트가 보이게 한다
   const anchor = valid(center) ? center : shown[0];
   const nearLm = anchor ? LANDMARKS.filter((l) => distanceM(anchor, l) <= LANDMARK_NEAR_M) : [];
@@ -269,6 +270,15 @@ export function renderMap(el, { center = null, places = [], me = null, selectedI
   // 근처 랜드마크 미니 일러스트 (글자 라벨 없음)
   for (const q of lms) svg += q.l.draw(r1(q.x), r1(q.y), 0.72, 'map');
 
+  // 코스 순서 점선: places 순서대로 핀을 잇는다 (SVG라 핀 아래에 깔림)
+  if (course) {
+    const pts = shown.map((p) => pins.find((q) => q.p === p)).filter(Boolean);
+    if (pts.length > 1) {
+      svg += '<path class="course-line" d="' + pts.map((q, i) => (i ? 'L' : 'M') + r1(q.x) + ',' + r1(q.y)).join(' ')
+        + '" stroke="#7a6a58" stroke-width="2" stroke-dasharray="4 5" fill="none"/>';
+    }
+  }
+
   // 선택한 장소까지 걷는 점선
   const sel = pins.find((q) => q.p.id === selectedId);
   let walk = false;
@@ -296,8 +306,8 @@ export function renderMap(el, { center = null, places = [], me = null, selectedI
   if (valid(me)) html += '<div class="me" style="' + pct(toXY(me)) + '"></div>';
   html += pins.map((q) => '<button type="button" class="pin ' + (q.p.kind === 'food' ? 'food' : 'tour') + (q.p.id === selectedId ? ' on' : '') + (q.hideLbl ? ' nolbl' : '')
     + '" data-id="' + esc(q.p.id) + '" style="' + pct(q) + '" aria-label="' + esc(q.p.title) + '">'
-    + '<span class="head"><span>' + placeEmoji(q.p) + '</span></span><span class="lbl">' + esc(q.p.title) + '</span></button>').join('');
-  html += '<div class="legend' + (river ? ' up' : '') + '">🧡 맛집 · 🩷 관광지 · 🔵 내 위치' + (walk ? ' · ⋯ 걸어서' : '') + '</div>';
+    + '<span class="head"><span>' + (course ? places.indexOf(q.p) + 1 : placeEmoji(q.p)) + '</span></span><span class="lbl">' + esc(q.p.title) + '</span></button>').join('');
+  html += '<div class="legend' + (river ? ' up' : '') + '">🧡 맛집 · 🩷 관광지 · 🔵 내 위치' + (walk ? ' · ⋯ 걸어서' : '') + (course ? ' · ⋯ 코스 순서' : '') + '</div>';
 
   el.innerHTML = html;
   el.querySelectorAll('.pin').forEach((b) => {

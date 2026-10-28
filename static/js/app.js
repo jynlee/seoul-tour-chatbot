@@ -113,7 +113,8 @@ function renderCard() {
   const card = $('#card');
   const place = state.cardOpen && state.places.find((p) => p.id === state.selectedId);
   if (!place) { card.hidden = true; card.innerHTML = ''; return; }
-  card.innerHTML = cardHtml(place, { centerLabel: state.center && state.center.label });
+  const index = state.places.indexOf(place);
+  card.innerHTML = cardHtml(place, { centerLabel: state.center && state.center.label, index, prev: index > 0 ? state.places[index - 1] : null });
   card.hidden = false;
   card.querySelector('.x').addEventListener('click', closeCard);
 }

@@ -160,6 +160,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .card .row .none { color: #aaa; }
 .card .tag { display: inline-block; font-size: 12px; padding: 1px 9px; border-radius: 999px; margin-left: 5px; vertical-align: 2px; }
 .card .tag.food { background: #fff1e0; color: #c46a12; }
+/* 코스: 카드 칸 배지 · 칩 순번 원 */
+.card .step { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; margin-left: 5px; vertical-align: 2px; background: #fff; border: 1.5px solid #ffb3c1; color: #c4506b; }
+.chip .n.circle { display: inline-block; width: 18px; height: 18px; line-height: 18px; border-radius: 50%; background: var(--pink); color: #fff; text-align: center; font-size: 12px; margin-right: 5px; }
+.chip.food .n.circle { background: var(--orange); }
 .card .tag.tour { background: #ffe6ec; color: #c4506b; }
 .card .x {
   position: absolute; top: 8px; right: 10px; border: 0; background: none; color: #bbb; font-size: 16px; padding: 4px;
