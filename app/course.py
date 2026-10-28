@@ -70,9 +70,10 @@ def _word_pos(text: str, word: str) -> int | None:
     return None
 
 
-def _first_pos(text: str, words) -> int | None:
-    """말들 중 문장에서 가장 앞에 나온 위치 (없으면 None)."""
-    found = [p for p in (_word_pos(text, w) for w in words) if p is not None]
+def _first_pos(text: str, words, topic: bool = False) -> int | None:
+    """말들 중 문장에서 가장 앞에 나온 위치 (없으면 None). topic이면 한 글자 말 규칙(_word_pos), 아니면 그냥 부분 문자열."""
+    find = _word_pos if topic else (lambda t, w: t.find(w) if w in t else None)
+    found = [p for p in (find(text, w) for w in words) if p is not None]
     return min(found) if found else None
 
 
@@ -95,7 +96,7 @@ def _kind_steps(message: str) -> list[Step]:
     for key, t in TOUR_TOPICS.items():
         words = [k for k in t.keywords if _word_pos(text, k) is not None]
         if words:
-            topic_pos[key] = (_first_pos(text, words), words)
+            topic_pos[key] = (_first_pos(text, words, topic=True), words)
     # '한강 야경'의 '한강'은 장소 이름일 뿐 → 야경이 있으면 한강만으로 산책 칸을 만들지 않는다
     if "night" in topic_pos and "nature" in topic_pos and set(topic_pos["nature"][1]) <= {"한강"}:
         del topic_pos["nature"]
