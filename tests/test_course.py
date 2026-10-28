@@ -1,3 +1,6 @@
+import pytest
+
+from app.course import is_course_question, plan_course
 from app.history import InMemoryHistoryRepo
 from app.schemas import ChatResponse, PlaceOut
 
@@ -27,11 +30,6 @@ def test_history_roundtrip_keeps_step():
     assert (got.step, got.leg_m, got.leg_walk_min) == ("카페", 420, 6)
 
 
-import pytest
-
-from app.course import is_course_question, plan_course
-
-
 def labels(plan):
     return [s.label for s in plan.steps]
 
@@ -45,6 +43,10 @@ def labels(plan):
     ("궁 보고 밥 먹고 카페 가는 코스", "custom", ["역사", "맛집", "카페"]),
     ("명동 코스 짜줘", "default", ["관광지", "맛집", "관광지", "카페"]),
     ("한강 데이트 코스", "custom", ["산책", "맛집", "카페"]),
+    ("맛집 코스", "custom", ["관광지", "맛집", "카페"]),
+    ("카페 가고 맛집 가는 코스", "custom", ["관광지", "카페", "맛집"]),
+    ("카페 코스", "custom", ["관광지", "카페", "맛집"]),
+    ("경복궁 근처 데이트 코스", "date", ["볼거리", "맛집", "카페", "야경"]),
 ])
 def test_plan_course(msg, theme, expected):
     plan = plan_course(msg)
