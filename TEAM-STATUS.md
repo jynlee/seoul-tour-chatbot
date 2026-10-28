@@ -236,6 +236,7 @@
 
 ## ⑧ 다음에 이어서 할 일
 - qa-data (2026-10-28): 02fee94 최종 확인 통과 → **main 병합 가능**(리드 결정). (이전 기록) 2026-10-27: 데이터 확장 QA 끝(⑦ 참고). QA-10·QA-11 수정 전에는 main 병합 보류 권장(둘 다 사용자 대화에서 바로 보이는 문제). 수정되면 `tests/api/test_data_expansion_api.py`의 xfail 지우고 재확인.
+- 리드 (2026-10-28): 개요 1,000건(누적 1,990/3,444)·상세 나머지(상세 있는 곳 2,446) 받음 → apply_merged·v3 재색인(3,441건)·단위+통합 488·JS 52 통과. **남은 개요 1,454건**(음식 941·쇼핑 199·축제 188·레포츠 125·문화 1) → 10/29·10/30에 fetch_overview → apply_merged → build_index v3. 상세는 끝.
 - 팀원4 (2026-10-27): 데이터 확장 2단계 반영·v3 색인 ✅, QA-10·11·12·10b·품질①②③·별칭 중복 ✅(⑦ 참고, 3,441곳). **남은 일 = 개요·상세 나머지 받기**(한도 각 1,000건/일): 매일 `python scripts/fetch_overview.py`(남은 2,454건, 문화 352·음식 1,586·레포츠 125·축제 188·쇼핑 199 → 약 3일)와 `python scripts/enrich_detail.py --raw data/raw/seoul_merged.json --out data/raw/detail.json --skip-from data/seoul_tour_enriched.json`(남은 1,959건 → 약 2일). 받은 뒤 `python scripts/apply_merged.py` → (개요가 늘었으면) `OPENSEARCH_INDEX=seoul-tour-v3 python scripts/build_index.py` → 커밋. 상세만 늘었으면 재색인 불필요(단 apply_merged가 출력하는 "중복 N곳 뺌" 목록이 바뀌면 재색인).
 - 팀원4 2단계 메모 ①~④(신분류 매핑·지역명 제목 제외·세부 장소 겹침·개요 임베딩/v3) ✅ 반영됨. 알려진 한계: "종로 역사 관광지"는 제목에 '역사'가 든 박물관이 앞에 나오고 경복궁은 5곳 밖(임베딩 순위가 대표성을 잘 못 잡음, 인기도 데이터 없음). "강남 관광지"는 갤러리(문화시설)만 나옴. 음식점 개요는 아직 없음(받으면 재색인).
 - 리드: 팀원 3명 띄우기 → 각자 ③에서 태스크 가져가기.
