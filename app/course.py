@@ -200,7 +200,7 @@ def build_course(message: str, plan: CoursePlan, center: Center | None, searcher
                 return False
             return len(one_per_group(chosen + [p])) == len(chosen) + 1
 
-        def candidates(near) -> list[Place]:
+        def candidates(near, extra=()) -> list[Place]:
             hits = searcher.knn(vector, step.content_types, step.cat3, CANDIDATES_K, near=near)
             found, seen = [], set()
             for pid, _score in hits:
@@ -209,6 +209,10 @@ def build_course(message: str, plan: CoursePlan, center: Center | None, searcher
                     continue
                 seen.add(pid)
                 found.append(p)
+            for p in extra:  # kNN 상위에 없던 후보를 뒤에 붙임
+                if p.id not in seen and usable(p):
+                    seen.add(p.id)
+                    found.append(p)
             found.sort(key=lambda p: -boost(p))  # 안정 정렬: 주제 맞는 곳 먼저, 그 안에서는 관련도순
             return found
 
@@ -216,7 +220,11 @@ def build_course(message: str, plan: CoursePlan, center: Center | None, searcher
         if prev is None:
             # 첫 칸(앞 칸이 빠졌어도 아직 못 골랐으면 같은 규칙): 구는 near 없이 그 구 안, 반경형은 1.5km, 기준점 없음은 서울 전체
             if gu is not None:
-                found = [p for p in candidates(None) if p.gu == gu]
+                # 구 이름과 같은 제목의 장소('강남')는 지역을 말한 것이라 뺌. kNN 상위에 없던 같은 구 장소도 뒤에 붙임(recommend 와 같음)
+                def in_gu(p: Place) -> bool:
+                    return p.gu == gu and p.title not in (gu, gu[:-1])
+
+                found = [p for p in candidates(None, [p for p in catalog.values() if in_gu(p)]) if in_gu(p)]
             elif center is not None:
                 found = candidates((center.lat, center.lng, WIDE_RADIUS_M))
             else:

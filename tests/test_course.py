@@ -129,7 +129,11 @@ def test_course_follows_step_order_and_walkable():
 
 
 def test_next_step_prefers_800m_then_widens():
-    near = _build(_basic() + [_food("f2", "먼식당", 0.009)] , plan=CoursePlan("c", (SIGHT, FOOD, CAFE)))
+    ps = _basic() + [_food("f2", "먼식당", 0.009)]
+    catalog = {p.id: p for p in ps}
+    # 먼 식당(f2, 1km)의 관련도가 더 높아도 800m 안 f1이 먼저
+    near = build_course("데이트 코스", CoursePlan("c", (SIGHT, FOOD, CAFE)), CENTER,
+                        FakeSearcher(catalog, scores={"f2": 9.0}), FakeEmbedder(), catalog)
     assert near.places[1].id == "f1"
     # 800m 안에 음식점이 없고 1.2km에 있으면 그것
     far = _build([_sight("s1", "한옥전시관"), _food("f2", "먼식당", 0.011), _cafe("c1", "좋은카페", 0.012)],
@@ -237,3 +241,18 @@ def test_topic_boost_orders_candidates():
     plan = CoursePlan("c", (plan_course("역사 코스 추천").steps[0], FOOD, CAFE))
     r = _build(ps, plan=plan, message="궁 코스")
     assert r.places[0].id == "b"
+
+
+def test_gu_center_first_stop_found_outside_knn_hits():
+    # 종로구 전시관이 kNN 결과에 없어도(다른 구만 상위) 구 안에서 첫 칸을 고른다
+    ps = [_sight("o", "성동 전시관", 0.0, gu="성동구"), _sight("in", "종로 전시관", 0.001),
+          _sight("gu", "종로구", 0.0), _food("f1", "맛있는집", 0.003), _cafe("c1", "좋은카페", 0.004)]
+    catalog = {p.id: p for p in ps}
+
+    class NoGuHits(FakeSearcher):
+        def knn(self, *a, **k):
+            return [h for h in super().knn(*a, **k) if self.catalog[h[0]].gu != "종로구" or self.catalog[h[0]].kind == "food"]
+
+    r = build_course("데이트 코스", CoursePlan("c", (SIGHT, FOOD, CAFE)), Center(LAT, LNG, "종로구", "gu"),
+                     NoGuHits(catalog), FakeEmbedder(), catalog)
+    assert r.places[0].id == "in" and r.ok
