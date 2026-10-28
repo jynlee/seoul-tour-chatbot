@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass
 
 from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE, Place, has_coords
-from app.center import Center
+from app.center import AREA_LIKE_TITLES, Center
 from app.geo import haversine_m, walk_min
 from app.intent import (
     CAFE_KEYWORDS, FESTIVAL_KEYWORDS, FOOD_KEYWORDS, TOUR_TOPICS, TOUR_TYPES, has_word,
@@ -19,6 +19,8 @@ GENERIC_TOUR_WORDS = ("관광", "명소", "볼거리", "가볼", "구경", "놀�
 MAX_STEPS = 4
 MIN_STEPS = 3
 _HANGUL = re.compile(r"[가-힣]")
+# 걷기 코스 이름('[종로둘레길 3코스] 낙산 코스')은 코스의 한 칸(장소)이 아님
+_WALK_COURSE_TITLE = re.compile(r"둘레길|코스\s*$")
 
 SIGHT_TYPES = frozenset({"12", "14"})
 # 관광 주제 → 칸 이름 (야경은 별도 칸 정의)
@@ -55,6 +57,13 @@ FOOD = Step("맛집", frozenset({FOOD_TYPE}), exclude_cat3=CAFE_CAT3)
 CAFE = Step("카페", frozenset({FOOD_TYPE}), cat3=CAFE_CAT3)
 NIGHT = Step("야경", frozenset(TOUR_TYPES), topic="night", required_topic=True, quiet_drop=True)
 FESTIVAL = Step("축제", frozenset({EVENT_TYPE}))
+
+
+def _night_title(p: Place, step: Step) -> bool:
+    t = TOUR_TOPICS[step.topic]
+    if t.exclude_pattern and re.search(t.exclude_pattern, p.title):
+        return False
+    return re.search(t.title_pattern, p.title) is not None
 
 
 def _topic_step(key: str) -> Step:
@@ -196,7 +205,12 @@ def build_course(message: str, plan: CoursePlan, center: Center | None, searcher
                 return False
             if part_of_center(p):
                 return False
-            if step.required_topic and not matches_topic(p.category, p.title, step.topic):
+            if p.title in AREA_LIKE_TITLES:  # '홍대'처럼 지역 이름을 가진 장소는 장소가 아니라 지역 (Ruling 9)
+                return False
+            if step.content_types == SIGHT_TYPES and _WALK_COURSE_TITLE.search(p.title):
+                return False
+            # 야경은 제목으로만 (건축/조형물 분류만으로는 동상도 걸림, Ruling 8)
+            if step.required_topic and not _night_title(p, step):
                 return False
             # 묶음(큰 관광지의 세부 시설) 검사는 음식점끼리는 하지 않는다: "인사동 한정식"·"인사동 찻집"은 별개 가게
             pool = [c for c in chosen if c.kind != "food"] if p.kind == "food" else chosen

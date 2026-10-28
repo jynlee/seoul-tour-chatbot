@@ -265,3 +265,28 @@ def test_gu_center_first_stop_found_outside_knn_hits():
     r = build_course("데이트 코스", CoursePlan("c", (SIGHT, FOOD, CAFE)), Center(LAT, LNG, "종로구", "gu"),
                      NoGuHits(catalog), FakeEmbedder(), catalog)
     assert r.places[0].id == "in" and r.ok
+
+
+# ---- 실데이터 확인 뒤 보정 (Ruling 8·9) ----
+def test_night_rejects_statue_accepts_bridge():
+    statue = _night("st", "전태일동상", 0.005)
+    r = _build(_basic()[:3] + [statue])
+    assert "야경" not in [p.step for p in r.places]
+    bridge = _night("br", "○○대교", 0.005)
+    r2 = _build(_basic()[:3] + [statue, bridge])
+    assert [p.id for p in r2.places if p.step == "야경"] == ["br"]
+
+
+def test_area_like_title_place_excluded_from_all_steps():
+    area = _sight("hd", "홍대", 0.0005)
+    r = _build(_basic() + [area])
+    assert "hd" not in [p.id for p in r.places]
+    r2 = _build([area, _food("f1", "맛있는집", 0.003), _cafe("c1", "좋은카페", 0.004)],
+                plan=CoursePlan("c", (SIGHT, FOOD, CAFE)))
+    assert not r2.ok  # 홍대만 있는 볼거리 칸은 비어 3곳이 안 됨
+
+
+@pytest.mark.parametrize("title", ["[종로둘레길 3코스] 낙산 코스", "북악산 둘레길", "서울 성곽 순례 코스"])
+def test_walking_course_titles_excluded_from_sight_steps(title):
+    r = _build(_basic() + [_sight("w", title, 0.0005)])
+    assert "w" not in [p.id for p in r.places]
