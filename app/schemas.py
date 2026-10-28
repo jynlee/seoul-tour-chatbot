@@ -34,8 +34,8 @@ class PlaceOut(BaseModel):
     distance_m: int | None = None
     walk_min: int | None = None
     step: str | None = None  # 코스 칸 이름(볼거리·맛집·카페·야경 등), 코스 아닐 때 null
-    leg_m: int | None = None  # 직전 칸에서 이 장소까지 걷는 거리(m), 첫 칸은 null
-    leg_walk_min: int | None = None  # 직전 칸에서 걷는 시간(분), 첫 칸은 null
+    leg_m: int | None = None  # 직전 칸(첫 칸은 기준점)에서 이 장소까지 걷는 거리(m), 기준점이 없거나 구면 첫 칸만 null
+    leg_walk_min: int | None = None  # 직전 칸(첫 칸은 기준점)에서 걷는 시간(분), 기준점이 없거나 구면 첫 칸만 null
 
 
 class CenterOut(BaseModel):

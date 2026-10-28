@@ -68,6 +68,19 @@ def test_not_course(msg):
     assert plan_course(msg) is None
 
 
+@pytest.mark.parametrize("msg", ["강서구 둘레길 코스 추천해줘", "등산 코스 추천해줘", "산책 코스 추천해줘",
+                                  "걷기 코스 알려줘", "트레킹 코스 추천", "둘레길코스 추천해줘"])
+def test_walk_trail_course_is_single_recommendation(msg):
+    # '둘레길 코스'의 '코스'는 걷는 길 이름이지 하루 일정이 아님 (Ruling 11)
+    assert plan_course(msg) is None
+
+
+def test_walk_course_with_other_steps_still_course():
+    assert plan_course("산책하고 맛집 가는 코스") is not None
+    assert plan_course("둘레길 코스 걷고 맛집 갈래") is not None
+    assert plan_course("한강 데이트 코스") is not None
+
+
 def test_course_word_alone():
     assert is_course_question("하루 일정 짜줘")
 

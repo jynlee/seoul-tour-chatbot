@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.center import Center, has_named_area, match_place, resolve_center
-from app.course import COURSE_WORDS, build_course, plan_course
+from app.course import COURSE_WORDS, DATE_WORDS, build_course, plan_course
 from app.dialog import (
     asked_fields, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
     intent_from_places, is_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference, wants_whole_seoul,
@@ -224,6 +224,13 @@ class ChatService:
         own = plan_course(msg)
         if own is not None and own.theme != "default":
             return False
+        # 코스 말 없이 장소 종류(맛집·카페·관광 세부 주제…)를 콕 집었으면 그 종류의 "다른 데 더" (Ruling 12)
+        if not any(w in msg for w in COURSE_WORDS):
+            text = msg
+            for w in DATE_WORDS:
+                text = text.replace(w, " ")
+            if detect_intent(text).has_category:
+                return False
         return not has_named_area(msg, self.deps.catalog) and match_place(msg, self.deps.catalog) is None
 
     def _last_course_question(self, messages) -> str | None:

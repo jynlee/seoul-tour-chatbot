@@ -126,8 +126,22 @@ def _kind_steps(message: str) -> list[Step]:
     return steps
 
 
+# '둘레길 코스'·'등산 코스'처럼 산책 주제 말 바로 뒤의 '코스'는 걷는 길 이름이지 하루 일정이 아님 (Ruling 11)
+_TRAIL_COURSE = re.compile(r"(?:둘레길|등산|산책|걷기|트레킹)\s?코스")
+
+
+def _is_trail_course(message: str) -> bool:
+    """'둘레길 코스' 등만 있고 다른 칸 말·데이트 말이 없으면 True (단일 추천)."""
+    if not _TRAIL_COURSE.search(message) or any(w in message for w in DATE_WORDS):
+        return False
+    rest = _TRAIL_COURSE.sub(" ", message)
+    return not _kind_steps(rest) and not any(w in rest for w in COURSE_WORDS)
+
+
 def plan_course(message: str) -> CoursePlan | None:
     """코스 질문이면 칸 계획, 아니면 None(단일 추천)."""
+    if _is_trail_course(message):
+        return None
     has_course = any(w in message for w in COURSE_WORDS)
     has_date = any(w in message for w in DATE_WORDS)
     kinds = _kind_steps(message)

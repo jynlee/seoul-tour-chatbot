@@ -154,6 +154,27 @@ def test_single_question_after_course_is_list(client):
     assert all(p["step"] is None for p in data["places"])
 
 
+def test_walk_trail_course_question_is_list(client):
+    data = say(client, "둘레길 코스 추천해줘", "test-course-20")
+    assert data["course"] is False
+    assert all(p["step"] is None for p in data["places"])
+
+
+@pytest.mark.parametrize("msg", ["다른 카페 더 보여줘", "맛집 다른 데 더"])
+def test_place_kind_more_after_course_is_list(client, msg):
+    # 종류를 콕 집은 "더"는 새 코스가 아니라 그 종류의 "다른 데 더" (Ruling 12)
+    say(client, "종로 데이트 추천해줘", "test-course-21")
+    data = say(client, msg, "test-course-21")
+    assert data["course"] is False
+    assert all(p["step"] is None for p in data["places"])
+    assert data["places"]
+
+
+def test_other_course_still_course_after_kind_check(client):
+    say(client, "종로 데이트 추천해줘", "test-course-22")
+    assert say(client, "다른 코스", "test-course-22")["course"] is True
+
+
 def test_course_fail_falls_back(client):
     # 성동구에는 카페 하나뿐 → 코스를 못 짜고 일반 관광 추천
     data = say(client, "성동구 데이트 코스 짜줘", "test-course-7")
