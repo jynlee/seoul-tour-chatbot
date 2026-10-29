@@ -6,7 +6,7 @@
 "종로 데이트 코스"라고 하면 **걸어서 이어지는 3~4곳 코스**를 짜 줍니다.
 
 <p align="center">
-  <img src="docs/images/app-screens.png" alt="① 첫 화면 → ② 코스 1번 핀을 누르면 뜨는 장소 카드 → ③ 추천 코스(번호 핀·점선) → ④ 거기 주차 가능해?·몇 시까지야? 이어 묻기" width="100%"><br>
+  <img src="docs/images/app-screens.png" alt="① 첫 화면 → ② 코스 1번 핀을 누르면 뜨는 장소 카드 → ③ 추천 코스(번호 핀·점선) → ④ 거기 주차 가능해?·몇 시까지야? 이어 묻기" width="85%"><br>
   <sub>① 첫 화면 · ② 남산순환나들길 핀을 누르면 뜨는 장소 카드 · ③ "종로 데이트코스 추천해줘" · ④ "거기 주차 가능해?" → "거기 몇 시까지야?" 이어 묻기</sub>
 </p>
 
@@ -63,23 +63,11 @@
 
 ## 동작 흐름
 
-```mermaid
-flowchart LR
-    A[질문] --> B{장소 정보 질문?<br>주차·영업·뭐하는 곳}
-    B -- 예 --> I[가리킨 장소의<br>상세·개요로 답]
-    B -- 아니오 --> C{코스 질문?}
-    C -- 예 --> K[칸마다 kNN 검색<br>앞 장소 800m→1.5km]
-    C -- 아니오 --> D[기준점 찾기<br>GPS·장소·지역·구·앞 대화]
-    D --> E[kNN 검색<br>기준점 1.5km 안]
-    E --> F[(OpenSearch<br>seoul-tour-v3)]
-    K --> F
-    F --> G[거리순 정렬·세부 시설 묶기<br>도보 분 계산]
-    G --> L[Gemma 답변<br>gemma4:e4b]
-    I --> L
-    L --> R[답 + 장소 목록<br>→ 지도 핀]
-    L -. Ollama 꺼짐 .-> T[정해진 문장 템플릿]
-    R --> H[(MySQL<br>대화 기록)]
-```
+<p align="center">
+  <img src="docs/images/request-flow.png" alt="질문 → 종류 판정 → ① 장소 정보 질문 / ② 추천 코스 / ③ 일반 추천 → 답 문장·화면·대화 저장" width="80%">
+</p>
+
+<sub>그림 원본: `docs/images/request-flow.html` (브라우저로 열어 고친 뒤 캡처) · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
 
 - **검색은 "후보 고르기"만:** OpenSearch는 질문과 의미가 가까운 장소 id만 돌려주고, 장소 정보·거리·도보 시간은 앱이 데이터 파일(카탈로그)에서 계산합니다.
 - **반경 안에서 검색:** kNN에 거리 필터를 함께 걸어, 장소가 많은 동네에서도 가까운 곳이 빠지지 않습니다.
@@ -87,16 +75,11 @@ flowchart LR
 
 ## 시스템 구조
 
-```mermaid
-flowchart LR
-    U[휴대폰 브라우저<br>HTML·CSS·JS] -- POST /api/chat --> S[FastAPI 서버]
-    S --> O[(OpenSearch<br>kNN·geo 필터)]
-    S --> M[(MySQL<br>chat_message)]
-    S --> L[Ollama<br>gemma4:e4b]
-    S --> E[임베딩<br>ko-sroberta-multitask]
-    P[관광공사 OpenAPI] -. 수집 스크립트 .-> D[data/*.json] -. build_index .-> O
-    D --> S
-```
+<p align="center">
+  <img src="docs/images/architecture.png" alt="휴대폰 브라우저 ⇄ FastAPI 서버 → OpenSearch·Ollama·MySQL, 데이터 준비: 관광공사 OpenAPI → 수집 스크립트 → data/*.json → build_index" width="80%">
+</p>
+
+<sub>그림 원본: `docs/images/architecture.html` · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
 
 ## 데이터
 
