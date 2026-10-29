@@ -88,7 +88,7 @@ def test_api_chat_and_history(client):
     r = client.post("/api/chat", json={"message": "광화문 근처 맛집 추천해줘"})
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"session_id", "answer", "center", "places"}
+    assert set(body) == {"session_id", "answer", "center", "places", "course"}
     h = client.get(f"/api/history/{body['session_id']}").json()
     assert [m["role"] for m in h["messages"]] == ["user", "assistant"]
     assert h["messages"][1]["places"] == body["places"]

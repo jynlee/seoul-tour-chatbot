@@ -22,7 +22,7 @@ def in_seoul(lat, lng):
 
 
 def assert_contract(body, catalog):
-    assert set(body) == {"session_id", "answer", "center", "places"}
+    assert set(body) == {"session_id", "answer", "center", "places", "course"}
     assert isinstance(body["answer"], str) and body["answer"]
     if body["center"] is not None:
         assert set(body["center"]) == {"lat", "lng", "label", "source"}

@@ -1,4 +1,5 @@
 """답변 문장 생성 (Ollama). 장소 목록은 LLM이 아니라 카탈로그에서 만든다."""
+import re
 from typing import Protocol
 
 from app.schemas import PlaceOut
@@ -210,6 +211,83 @@ def template_answer(places: list[PlaceOut], center_label: str | None, far: bool 
     if center_label:
         return f"{center_label} 근처 추천 장소를 지도에 표시했어요: {names}"
     return f"추천 장소를 지도에 표시했어요: {names}"
+
+
+COURSE_HOURS_NOTE = "영업시간은 가기 전에 한 번 확인해 주세요."
+COURSE_CAFE_DROPPED = "이 근처는 카페 정보가 적어 코스에서 뺐어요."
+COURSE_DROPPED = "이 근처는 {labels} 정보가 적어 코스에서 뺐어요."  # 카페 외 칸
+COURSE_FAIL_NOTICE = "{where}걸어서 이어지는 코스를 짜기 어려워서 가까운 곳들을 대신 골랐어요."
+
+
+def display_title(title: str) -> str:
+    """앞의 대괄호 덩어리 제거: "[K드라마 촬영지] 공근혜갤러리" → "공근혜갤러리" (소괄호·뒤쪽 대괄호는 그대로)."""
+    return re.sub(r"^\s*\[[^\]]*\]\s*", "", title) or title
+
+
+def _course_line(i: int, p: PlaceOut) -> str:
+    line = f"{i}. {display_title(p.title)} ({p.step})"
+    if p.leg_walk_min is not None:
+        line += f" — {'기준점' if i == 1 else '앞 장소'}에서 도보 {p.leg_walk_min}분"
+    return line
+
+
+def build_course_prompt(message: str, history_texts: list[str], places: list[PlaceOut],
+                        center_label: str | None, dropped: list[str]) -> str:
+    """만든 코스를 순서대로 설명하게 하는 프롬프트. 칸·거리는 코드가 정했고 LLM은 말만 붙인다."""
+    history = "\n".join(history_texts[-HISTORY_LIMIT:]) or "(없음)"
+    course_text = "\n".join(_course_line(i, p) for i, p in enumerate(places, 1)) or "(없음)"
+    rules = [
+        "반드시 한국어로, 4문장 이내로만 답변할 것",
+        "아래 [코스]에 있는 장소만 언급하고, 목록에 없는 장소를 지어내지 말 것",
+        "[코스]의 순서대로 흐름을 말할 것 (먼저 ○○, 이어서 ○○처럼). 순서를 바꾸지 말 것",
+        "도보 시간은 [코스]에 적힌 것만 말하고, 영업시간·가격·메뉴처럼 [코스]에 없는 정보는 말하지 말 것",
+        "[이전 대화]는 흐름을 이어 가는 데만 쓸 것",
+        "친근한 말투로, 장소 목록은 지도에 표시된다는 점을 고려해 핵심만 말할 것",
+    ]
+    if dropped:
+        rules.append(f"{'·'.join(dropped)} 칸은 이 근처에 정보가 적어 코스에서 뺐다. 첫 문장에서 이 점을 솔직히 말할 것")
+    if center_label:
+        rules.append(f"위치를 말할 때는 [기준점]인 '{center_label}'만 쓰고, 이전 대화에 나온 다른 지역 이름을 쓰지 말 것")
+    else:
+        rules.append("기준점이 없으므로 특정 동네·지역 이름을 지어내지 말 것")
+    rules_text = "\n".join(f"{i}. {r}" for i, r in enumerate(rules, 1))
+    return f"""너는 서울 관광 안내 챗봇 "서울 여행 친구"야. 반드시 한국어로만 답변해.
+
+규칙:
+{rules_text}
+
+[이전 대화]
+{history}
+
+[기준점]
+{center_label or "(기준점 없음)"}
+
+[코스]
+{course_text}
+
+[현재 질문]
+{message}
+
+[답변] (4문장 이내로)"""
+
+
+def course_template_answer(places: list[PlaceOut]) -> str:
+    """LLM 없이 만든 코스 답. 칸 사이는 다음 장소까지 도보 시간(없으면 화살표만). 영업시간 안내는 호출 쪽이 붙인다."""
+    parts = []
+    for i, p in enumerate(places, 1):
+        if i > 1:
+            parts.append(f" → 도보 {p.leg_walk_min}분 → " if p.leg_walk_min is not None else " → ")
+        parts.append(f"{i}. {display_title(p.title)}({p.step})")
+    return "코스를 짜 봤어요: " + "".join(parts)
+
+
+def dropped_notice(dropped: list[str]) -> str | None:
+    """코스에서 뺀 칸 안내. 카페만 빠졌으면 카페 문구, 다른 칸이 있으면 라벨을 모두 묶어서."""
+    if not dropped:
+        return None
+    if dropped == ["카페"]:
+        return COURSE_CAFE_DROPPED
+    return COURSE_DROPPED.format(labels="·".join(dropped))
 
 
 class OllamaLLM:

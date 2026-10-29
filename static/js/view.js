@@ -6,22 +6,33 @@ import { computeBounds, project } from './map.js';
 
 const hasWalk = (p) => Number.isFinite(p.walk_min);
 
+// 추천 코스인지: 장소에 칸 이름(step)이 하나라도 있으면 코스 (기록 다시 불러오기도 같은 판정)
+export function isCourse(places) {
+  return (places || []).some((p) => p.step);
+}
+
 export function chipLabel(place) {
   return placeEmoji(place) + ' ' + place.title + (hasWalk(place) ? ' ' + place.walk_min + '분' : '');
 }
 
 // 정보 카드. centerLabel = 응답 center.label (도보 시간 기준점 이름)
-export function cardHtml(place, { centerLabel } = {}) {
+// 코스일 때 index = places 안 순번(0부터), prev = 바로 앞 장소 (첫 곳은 null)
+export function cardHtml(place, { centerLabel, index = 0, prev = null } = {}) {
   const food = place.kind === 'food';
   const emoji = placeEmoji(place);
   const img = place.image
     ? '<img src="' + esc(place.image) + '" alt="" loading="lazy" onerror="this.remove()">'
     : '';
-  const walk = hasWalk(place)
+  const course = !!place.step;
+  const legWalk = Number.isFinite(place.leg_walk_min)
+    ? '<div class="row">🚶 ' + (prev ? '앞 장소(' + esc(prev.title) + ')' : esc(centerLabel || '여기')) + '에서 약 ' + place.leg_walk_min + '분</div>'
+    : '';
+  const walk = course ? legWalk : hasWalk(place)
     ? '<div class="row">🚶 ' + esc(centerLabel || '여기') + '에서 약 ' + place.walk_min + '분</div>'
     : '';
   return '<div class="img ' + (food ? 'food' : 'tour') + '"><span>' + emoji + '</span>' + img + '</div>'
     + '<div class="body"><div class="name"><b>' + esc(place.title) + '</b>'
+    + (course ? '<span class="step">' + (index + 1) + ' · ' + esc(place.step) + '</span>' : '')
     + (place.category ? '<span class="tag ' + (food ? 'food' : 'tour') + '">' + esc(place.category) + '</span>' : '') + '</div>'
     + '<div class="row">📍 ' + esc(place.addr || '주소 정보 없음') + '</div>'
     + '<div class="row">📞 ' + (place.tel ? esc(place.tel) : '<span class="none">전화번호 정보 없음</span>') + '</div>'
@@ -48,9 +59,11 @@ export function foldBarHtml(center, places) {
     const q = project(p.lat, p.lng, b, 40, 22);
     return '<i style="left:' + Math.round(q.x + 6) + 'px;top:' + Math.round(q.y + 6) + 'px;background:' + (p.kind === 'food' ? '#ff9f43' : '#ff8fa3') + '"></i>';
   }).join('');
-  const title = center && center.label ? esc(center.label) + (center.source === 'gu' ? '' : ' 근처') : '추천 장소';
+  const course = isCourse(places);
+  const title = center && center.label ? esc(center.label) + (course || center.source === 'gu' ? '' : ' 근처') : course ? '추천 코스' : '추천 장소';
+  const count = course ? (center && center.label ? ' · 코스 ' : ' · ') : ' · 추천 ';
   return '<div class="mini">' + dots + '</div>'
-    + '<div class="sum"><b>' + title + '</b><span> · 추천 ' + places.length + '곳</span></div>'
+    + '<div class="sum"><b>' + title + '</b><span>' + count + places.length + '곳</span></div>'
     + '<span class="open">지도 보기 ▾</span>';
 }
 
@@ -59,7 +72,10 @@ export function placesView(has, mapOpen) {
   return { map: has && mapOpen, handle: has && mapOpen, fold: has && !mapOpen, chips: has && !mapOpen };
 }
 
+// 코스 칩: 제목 앞에 색 원 안 순번 (맛집 주황·관광 분홍은 CSS)
 export function placeChipsHtml(places, selectedId = null) {
-  return places.map((p) => '<button type="button" class="chip ' + (p.kind === 'food' ? 'food' : 'tour') + '" data-id="' + esc(p.id) + '"'
-    + (p.id === selectedId ? ' aria-pressed="true"' : '') + '>' + esc(chipLabel(p)) + '</button>').join('');
+  const course = isCourse(places);
+  return places.map((p, i) => '<button type="button" class="chip ' + (p.kind === 'food' ? 'food' : 'tour') + '" data-id="' + esc(p.id) + '"'
+    + (p.id === selectedId ? ' aria-pressed="true"' : '') + '>'
+    + (course ? '<span class="n circle">' + (i + 1) + '</span>' + esc(p.title) : esc(chipLabel(p))) + '</button>').join('');
 }

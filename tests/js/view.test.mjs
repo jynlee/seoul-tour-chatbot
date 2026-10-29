@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cardHtml, chipLabel, bubbleHtml, foldBarHtml, placeChipsHtml, placesView } from '../../static/js/view.js';
+import { cardHtml, chipLabel, bubbleHtml, foldBarHtml, placeChipsHtml, placesView, isCourse } from '../../static/js/view.js';
 
 const GUNG = {
   id: '2786391', title: '개성만두 궁', kind: 'food', category: '한식',
@@ -94,4 +94,59 @@ test('장소가 없으면 지도·손잡이·요약 바·칩 모두 숨김', () 
   const none = { map: false, handle: false, fold: false, chips: false };
   assert.deepEqual(placesView(false, true), none);
   assert.deepEqual(placesView(false, false), none);
+});
+
+// ---------- 추천 코스 ----------
+const COURSE = [
+  { id: 'c1', title: '경복궁', kind: 'tour', category: '고궁', addr: 'a', tel: '', lat: 37.5796, lng: 126.977, step: '볼거리', leg_walk_min: null },
+  { id: 'c2', title: '토속촌', kind: 'food', category: '한식', addr: 'b', tel: '', lat: 37.578, lng: 126.973, step: '맛집', leg_walk_min: 9 },
+  { id: 'c3', title: '커피친구', kind: 'food', category: '카페', addr: 'c', tel: '', lat: 37.577, lng: 126.97, step: '카페', leg_walk_min: 6 },
+];
+
+test('isCourse: step이 하나라도 있으면 코스', () => {
+  assert.equal(isCourse(COURSE), true);
+  assert.equal(isCourse([GUNG]), false);
+  assert.equal(isCourse([]), false);
+});
+
+test('코스 칩: 색 원 안 순번 + 제목', () => {
+  const html = placeChipsHtml(COURSE);
+  assert.match(html, /<span class="n circle">1<\/span>경복궁/);
+  assert.match(html, /chip food[^>]*><span class="n circle">2<\/span>토속촌/);
+  assert.doesNotMatch(html, /🍽️|🩷/);
+});
+
+test('코스 아닌 칩은 그대로', () => {
+  assert.doesNotMatch(placeChipsHtml([GUNG]), /circle/);
+});
+
+test('코스 카드: 칸 배지 "n · 칸"', () => {
+  const html = cardHtml(COURSE[1], { centerLabel: '종로', index: 1, prev: COURSE[0] });
+  assert.match(html, /<span class="step">2 · 맛집<\/span>/);
+  assert.match(html, /class="tag food"/);
+});
+
+test('코스 카드 도보 줄: 첫 곳은 기준점, 다음은 앞 장소', () => {
+  const first = cardHtml({ ...COURSE[0], leg_walk_min: 5 }, { centerLabel: '종로', index: 0, prev: null });
+  assert.match(first, /🚶 종로에서 약 5분/);
+  const second = cardHtml(COURSE[1], { centerLabel: '종로', index: 1, prev: COURSE[0] });
+  assert.match(second, /🚶 앞 장소\(경복궁\)에서 약 9분/);
+});
+
+test('코스 카드: leg_walk_min이 없으면 도보 줄 없음', () => {
+  assert.doesNotMatch(cardHtml(COURSE[0], { centerLabel: '종로', index: 0, prev: null }), /🚶/);
+});
+
+test('코스 아닌 카드는 walk_min 줄 그대로, 배지 없음', () => {
+  const html = cardHtml(GUNG, { centerLabel: '광화문' });
+  assert.match(html, /🚶 광화문에서 약 12분/);
+  assert.doesNotMatch(html, /class="step"/);
+});
+
+test('접힘 바: 코스는 "{label} · 코스 N곳", 기준점 없으면 "추천 코스 · N곳"', () => {
+  const c = { lat: 37.5796, lng: 126.977, label: '종로', source: 'place' };
+  const a = foldBarHtml(c, COURSE);
+  assert.match(a, /<b>종로<\/b><span> · 코스 3곳<\/span>/);
+  assert.doesNotMatch(a, /근처/);
+  assert.match(foldBarHtml(null, COURSE), /<b>추천 코스<\/b><span> · 3곳<\/span>/);
 });

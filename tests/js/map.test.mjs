@@ -121,3 +121,40 @@ test('핀 이모지', () => {
   assert.equal(placeEmoji({ kind: 'tour', category: '축제' }), '🎉');
   assert.equal(placeEmoji({ kind: 'tour', category: '기타' }), '📍');
 });
+
+// ---------- 추천 코스 지도 ----------
+import { renderMap } from '../../static/js/map.js';
+
+function mapHtml(opts) {
+  const el = { innerHTML: '', querySelectorAll: () => [] };
+  renderMap(el, opts);
+  return el.innerHTML;
+}
+const CPLACES = [
+  { id: 'a', title: '경복궁', kind: 'tour', lat: 37.5796, lng: 126.977, step: '볼거리' },
+  { id: 'b', title: '토속촌', kind: 'food', lat: 37.5780, lng: 126.973, step: '맛집' },
+  { id: 'c', title: '커피친구', kind: 'food', lat: 37.5725, lng: 126.9815, step: '카페' },
+  { id: 'd', title: '정동전망대', kind: 'tour', lat: 37.5648, lng: 126.9758, step: '야경' },
+];
+
+test('코스 지도: 순번 핀 4개 + 순서 점선 path 1개 + 범례', () => {
+  const html = mapHtml({ center: null, places: CPLACES });
+  const nums = [...html.matchAll(/<span class="head"><span>(\d)<\/span>/g)].map((m) => m[1]).sort();
+  assert.deepEqual(nums, ['1', '2', '3', '4']);
+  assert.equal((html.match(/data-id=/g) || []).length, 4);
+  assert.equal((html.match(/class="course-line"/g) || []).length, 1);
+  assert.match(html, /stroke-dasharray="4 5"/);
+  assert.match(html, /⋯ 코스 순서/);
+});
+
+test('코스 점선은 places 순서대로 이어진다 (M 하나 + L 셋)', () => {
+  const html = mapHtml({ center: null, places: CPLACES });
+  const d = html.match(/<path class="course-line" d="([^"]+)"/)[1];
+  assert.match(d, /^M[\d.]+,[\d.]+( L[\d.]+,[\d.]+){3}$/);
+});
+
+test('코스 아닌 지도는 이모지 핀·점선 없음', () => {
+  const html = mapHtml({ center: null, places: CPLACES.map(({ step, ...p }) => p) });
+  assert.doesNotMatch(html, /course-line|코스 순서/);
+  assert.match(html, /<span class="head"><span>(🍽️|📍|[^\d<])/u);
+});

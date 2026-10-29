@@ -79,8 +79,24 @@ def test_live_food_near_gwanghwamun_then_cafe(live):
     msgs = client.get(f"/api/history/{sid}").json()["messages"]
     assert [m["role"] for m in msgs] == ["user", "assistant"] * 3
     assert all(ISO.match(m["created_at"]) for m in msgs)
-    assert msgs[1]["places"] == first["places"] and msgs[1]["center"] == first["center"]
-    assert msgs[3]["places"] == second["places"]
+    # 기록은 MySQL JSON을 거쳐 좌표 마지막 자리가 달라질 수 있어 좌표만 approx 로 비교
+    assert_same_places(msgs[1]["places"], first["places"])
+    assert_same_center(msgs[1]["center"], first["center"])
+    assert_same_places(msgs[3]["places"], second["places"])
+
+
+def assert_same_places(a, b):
+    assert [p["id"] for p in a] == [p["id"] for p in b]
+    for x, y in zip(a, b):
+        assert {k: v for k, v in x.items() if k not in ("lat", "lng")} == {k: v for k, v in y.items() if k not in ("lat", "lng")}
+        assert x["lat"] == pytest.approx(y["lat"]) and x["lng"] == pytest.approx(y["lng"])
+
+
+def assert_same_center(a, b):
+    assert (a is None) == (b is None)
+    if a:
+        assert a["label"] == b["label"] and a["source"] == b["source"]
+        assert a["lat"] == pytest.approx(b["lat"]) and a["lng"] == pytest.approx(b["lng"])
 
 
 def test_live_demonstrative_first_message(live):

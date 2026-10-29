@@ -1,6 +1,7 @@
 import pytest
 
-from app.llm import LLMUnavailable, OllamaLLM, build_prompt, template_answer
+from app.llm import (COURSE_CAFE_DROPPED, LLMUnavailable, OllamaLLM, build_course_prompt, build_prompt,
+                     course_template_answer, display_title, dropped_notice, template_answer)
 from app.schemas import PlaceOut
 
 
@@ -88,3 +89,49 @@ def test_gu_wide_prompt_has_no_distance_rules():
     prompt = build_prompt("강서구 공원", [], [p], "강서구", None, gu_wide=True)
     assert "조금 멂" not in prompt and "도보" not in prompt
     assert "조금 멂" in build_prompt("마곡 공원", [], [p], "마곡", None)
+
+
+def _stop(title, step, leg=None):
+    return PlaceOut(id=title, title=title, kind="tour", category="관광지", addr="서울 종로구", tel="",
+                    lat=37.57, lng=126.98, image="", step=step, leg_m=None if leg is None else leg * 67,
+                    leg_walk_min=leg)
+
+
+def test_display_title_strips_leading_bracket():
+    assert display_title("[K드라마 촬영지] 공근혜갤러리") == "공근혜갤러리"
+    assert display_title("경복궁") == "경복궁"
+    assert display_title("토속촌 (삼계탕)") == "토속촌 (삼계탕)"
+
+
+def test_course_prompt_lists_steps_in_order_with_walk():
+    places = [_stop("[K드라마 촬영지] 경복궁", "볼거리", 9), _stop("토속촌", "맛집", 6), _stop("나무카페", "카페")]
+    prompt = build_course_prompt("경복궁 근처 코스", ["사용자: 안녕"], places, "경복궁", [])
+    assert "1. 경복궁 (볼거리) — 기준점에서 도보 9분" in prompt
+    assert "2. 토속촌 (맛집) — 앞 장소에서 도보 6분" in prompt
+    assert "3. 나무카페 (카페)" in prompt and "3. 나무카페 (카페) —" not in prompt
+    assert "[K드라마" not in prompt
+    assert prompt.index("경복궁 (볼거리)") < prompt.index("토속촌 (맛집)") < prompt.index("나무카페 (카페)")
+    assert "4문장" in prompt and "[코스]" in prompt and "경복궁 근처 코스" in prompt
+
+
+def test_course_prompt_mentions_dropped():
+    places = [_stop("A", "볼거리"), _stop("B", "맛집"), _stop("C", "볼거리")]
+    prompt = build_course_prompt("코스", [], places, None, ["카페"])
+    assert "카페" in prompt and "첫 문장" in prompt
+    assert "(기준점 없음)" in prompt
+    assert "동네" in prompt  # 기준점 없으면 동네 이름 지어내지 말 것
+
+
+def test_course_template_answer_format():
+    places = [_stop("경복궁", "볼거리", 9), _stop("토속촌", "맛집", 6), _stop("○○", "카페", None)]
+    assert course_template_answer(places) == "코스를 짜 봤어요: 1. 경복궁(볼거리) → 도보 6분 → 2. 토속촌(맛집) → 3. ○○(카페)"
+    places[2].leg_walk_min = 5
+    assert course_template_answer(places) == (
+        "코스를 짜 봤어요: 1. 경복궁(볼거리) → 도보 6분 → 2. 토속촌(맛집) → 도보 5분 → 3. ○○(카페)")
+
+
+def test_dropped_notice_cafe_vs_other():
+    assert dropped_notice(["카페"]) == COURSE_CAFE_DROPPED
+    assert dropped_notice(["축제"]) == "이 근처는 축제 정보가 적어 코스에서 뺐어요."
+    assert dropped_notice(["카페", "축제"]) == "이 근처는 카페·축제 정보가 적어 코스에서 뺐어요."
+    assert dropped_notice([]) is None
