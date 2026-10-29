@@ -67,7 +67,7 @@
   <img src="docs/images/flow.png" alt="질문 → 종류 판정 → ① 장소 정보 질문 / ② 추천 코스 / ③ 일반 추천 → 답 문장·화면·대화 저장" width="100%">
 </p>
 
-<sub>그림 원본: `docs/images/flow.html` (브라우저로 열어 고친 뒤 캡처)</sub>
+<sub>그림 원본: `docs/images/flow.html` (브라우저로 열어 고친 뒤 캡처) · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
 
 - **검색은 "후보 고르기"만:** OpenSearch는 질문과 의미가 가까운 장소 id만 돌려주고, 장소 정보·거리·도보 시간은 앱이 데이터 파일(카탈로그)에서 계산합니다.
 - **반경 안에서 검색:** kNN에 거리 필터를 함께 걸어, 장소가 많은 동네에서도 가까운 곳이 빠지지 않습니다.
@@ -75,16 +75,11 @@
 
 ## 시스템 구조
 
-```mermaid
-flowchart LR
-    U[휴대폰 브라우저<br>HTML·CSS·JS] -- POST /api/chat --> S[FastAPI 서버]
-    S --> O[(OpenSearch<br>kNN·geo 필터)]
-    S --> M[(MySQL<br>chat_message)]
-    S --> L[Ollama<br>gemma4:e4b]
-    S --> E[임베딩<br>ko-sroberta-multitask]
-    P[관광공사 OpenAPI] -. 수집 스크립트 .-> D[data/*.json] -. build_index .-> O
-    D --> S
-```
+<p align="center">
+  <img src="docs/images/architecture.png" alt="휴대폰 브라우저 ⇄ FastAPI 서버 → OpenSearch·Ollama·MySQL, 데이터 준비: 관광공사 OpenAPI → 수집 스크립트 → data/*.json → build_index" width="100%">
+</p>
+
+<sub>그림 원본: `docs/images/architecture.html` · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
 
 ## 데이터
 
