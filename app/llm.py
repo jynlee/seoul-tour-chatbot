@@ -135,6 +135,11 @@ def _labels():
     return FIELD_LABELS
 
 
+INFO_OVERVIEW_CHARS = 300  # 장소 소개 근거로 넣는 개요 앞부분
+FIRST_SENTENCE_MAX = 150    # LLM 없이 답할 때 붙이는 개요 첫 문장 최대 길이
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
+
+
 def _place_facts(place) -> list[str]:
     labels = _labels()
     facts = [f"이름: {place.title}", f"분류: {place.category}", f"주소: {place.addr}",
@@ -142,11 +147,18 @@ def _place_facts(place) -> list[str]:
     for key, value in place.detail.items():
         if value:
             facts.append(f"{labels.get(key, key)}: {value}")
+    if place.overview:
+        facts.append(f"소개: {place.overview[:INFO_OVERVIEW_CHARS]}")
     return facts
 
 
+def _first_sentence(text: str) -> str:
+    m = _SENTENCE_END.search(text)
+    return text[:m.end()] if m and m.end() <= FIRST_SENTENCE_MAX else ""
+
+
 def build_info_prompt(message: str, history_texts: list[str], place, fields: list[str]) -> str:
-    """장소 하나에 대한 정보 질문(주차·영업시간·어디야 등). 근거는 이 장소의 기본 정보와 detail 뿐."""
+    """장소 하나에 대한 정보 질문(주차·영업시간·어디야 등). 근거는 이 장소의 기본 정보·detail·개요 앞부분."""
     labels = _labels()
     history = "\n".join(history_texts[-HISTORY_LIMIT:]) or "(없음)"
     facts = "\n".join(f"- {f}" for f in _place_facts(place))
@@ -158,6 +170,8 @@ def build_info_prompt(message: str, history_texts: list[str], place, fields: lis
         f"물어본 항목이 [장소 정보]에 없으면 지어내지 말고 '○○ 정보는 없어요'라고 말한 뒤 {tel_rule}",
         "이전 대화는 말투와 흐름을 맞추는 데만 쓰고, 사실 근거로 쓰지 말 것",
     ]
+    if not fields and place.overview:
+        rules.insert(1, "물어본 항목이 (장소 소개)면 [장소 정보]의 '소개'를 바탕으로 어떤 곳이고 무엇을 할 수 있는지 말할 것")
     rules_text = "\n".join(f"{i}. {r}" for i, r in enumerate(rules, 1))
     return f"""너는 서울 관광 안내 챗봇 "서울 여행 친구"야. 반드시 한국어로만 답변해.
 
@@ -187,7 +201,8 @@ def info_template_answer(place, fields: list[str]) -> str:
     if not fields:
         answer = f"{place.title}: {place.category}, 주소 {place.addr}"
         answer += f", 전화 {place.tel}." if place.tel else "."
-        return answer
+        first = _first_sentence(place.overview) if place.overview else ""
+        return f"{answer} {first}" if first else answer
     parts, missing = [], False
     for f in fields:
         value = info_value(place, f)
