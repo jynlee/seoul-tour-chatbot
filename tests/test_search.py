@@ -27,7 +27,7 @@ def test_index_name_guard():
         index_name_guard("seoul-tour")
     with pytest.raises(ValueError):
         index_name_guard("")
-    assert index_name_guard("seoul-tour-v2") == "seoul-tour-v2"
+    assert index_name_guard("seoul-tour-v3") == "seoul-tour-v3"
 
 
 def test_document_text(small_catalog):
@@ -37,14 +37,10 @@ def test_document_text(small_catalog):
     assert "종로구" in text
 
 
-def test_write_guard_protects_v2():
-    for name in ("seoul-tour", "seoul-tour-v2", "food-materials", " seoul-tour-v2 "):
+def test_guard_protects_other_project_indexes():
+    for name in ("seoul-tour", "food-materials", "food-law-articles", "food-qa-cache", " food-materials "):
         with pytest.raises(ValueError):
-            index_name_guard(name, write=True)
-    with pytest.raises(ValueError):
-        index_name_guard("food-materials")
-    assert index_name_guard("seoul-tour-v2") == "seoul-tour-v2"  # 읽기는 허용 (8000 확인 서버)
-    assert index_name_guard("seoul-tour-v3", write=True) == "seoul-tour-v3"
+            index_name_guard(name)
 
 
 def test_document_text_includes_overview_cut(small_catalog):
