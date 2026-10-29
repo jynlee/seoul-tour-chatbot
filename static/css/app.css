@@ -38,7 +38,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------- 첫 화면 S2a ---------- */
 .home { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
-.home-art { display: block; width: 100%; flex-shrink: 0; }
+/* 화면이 짧으면(9:16 휴대폰) 그림이 줄어들어 인사말·칩이 입력창에 가리지 않게 함 (늘어나지는 않음) */
+.home-art { display: block; width: 100%; flex: 0 1 auto; min-height: 220px; }
 /* 포인터를 따라다니는 🎒 (follower.js) — 클릭을 막지 않음 */
 .follower {
   position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; user-select: none;
