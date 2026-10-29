@@ -145,9 +145,9 @@ function setPlaces(center, places, me = null) {
 }
 
 // ---------- 대화 ----------
-function addBubble(role, text) {
+function addBubble(role, text, names) {
   const chat = $('#chat');
-  chat.insertAdjacentHTML('beforeend', bubbleHtml(role, text));
+  chat.insertAdjacentHTML('beforeend', bubbleHtml(role, text, names));
   chat.scrollTop = chat.scrollHeight;
   return chat.lastElementChild;
 }
@@ -175,7 +175,9 @@ async function send(message) {
     });
     if (res.session_id) { state.sessionId = res.session_id; saveSession(res.session_id, tabStore); }
     typing.remove();
-    addBubble('assistant', res.answer);
+    // 장소 이름 굵게: 새 목록이면 그 장소들, 정보 답처럼 목록이 없으면 지금 지도에 있는 장소들
+    const shown = res.places && res.places.length ? res.places : state.places;
+    addBubble('assistant', res.answer, (shown || []).map((p) => p.title));
     setBadge(res.center);
     // 장소가 있는 답변만 지도를 바꾼다 (인사·감사 등은 지도 유지)
     if (res.places && res.places.length) {
@@ -259,7 +261,13 @@ async function restore() {
   const msgs = (hist && hist.messages) || [];
   if (!msgs.length) return;
   showResult();
-  for (const m of msgs) addBubble(m.role === 'user' ? 'user' : 'assistant', m.message);
+  let shownTitles = []; // 그 답 시점에 지도에 있던 장소 이름 (정보 답은 설명한 장소도)
+  for (const m of msgs) {
+    if (m.role === 'user') { addBubble('user', m.message); continue; }
+    if (m.places && m.places.length) shownTitles = m.places.map((p) => p.title);
+    const focus = !(m.places && m.places.length) && m.center && m.center.source === 'place' ? [m.center.label] : [];
+    addBubble('assistant', m.message, [...shownTitles, ...focus]);
+  }
   const lastCenter = [...msgs].reverse().find((m) => m.role !== 'user' && m.center);
   if (lastCenter) { // 복원은 애니메이션 없이 바로
     state.badgeId = pickBadge(lastCenter.center, state.badgeId);

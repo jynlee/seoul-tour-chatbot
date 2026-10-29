@@ -40,11 +40,31 @@ export function cardHtml(place, { centerLabel, index = 0, prev = null } = {}) {
     + '<button type="button" class="x" aria-label="닫기">✕</button>';
 }
 
-// role: user | assistant | error | typing
-export function bubbleHtml(role, text) {
+const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// 장소 이름 변형: 그대로 · 앞 대괄호 뗀 이름 · 뒤 괄호 뗀 이름 (띄어쓰기는 뺀 모양, 2글자 이상)
+function nameVariants(title) {
+  const shown = title.replace(/^\s*\[[^\]]*\]\s*/, '') || title;
+  return [title, shown, shown.replace(/\s*\([^()]*\)\s*$/, '')]
+    .map((n) => n.replace(/\s/g, ''))
+    .filter((n) => n.length >= 2);
+}
+
+// 이스케이프된 말풍선 글에서 장소 이름을 **이름** 으로 감싼다. 글자 사이 띄어쓰기 차이("스탈릿 성수")는 봐주고,
+// 긴 이름부터 찾으며(성수연방 > 성수), 이미 ** 안인 부분은 건드리지 않는다.
+export function markNames(escaped, titles) {
+  const names = [...new Set((titles || []).filter(Boolean).flatMap(nameVariants))].sort((a, b) => b.length - a.length);
+  if (!names.length) return escaped;
+  const pattern = new RegExp(names.map((n) => [...n].map((ch) => reEsc(esc(ch))).join('\\s?')).join('|'), 'g');
+  return escaped.split(/(\*\*.+?\*\*)/).map((part, i) => (i % 2 ? part : part.replace(pattern, '**$&**'))).join('');
+}
+
+// role: user | assistant | error | typing. names = 굵게 보일 장소 이름들 (답이 말하는 장소)
+export function bubbleHtml(role, text, names = []) {
   if (role === 'typing') return '<div class="bub b typing"><i></i><i></i><i></i></div>';
   const cls = role === 'user' ? 'bub u' : role === 'error' ? 'bub b err' : 'bub b';
   let body = esc(text);
+  if (role === 'assistant') body = markNames(body, names);
   if (role !== 'user') body = body.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   body = body.replace(/\n/g, '<br>');
   return '<div class="' + cls + '">' + body + '</div>';
