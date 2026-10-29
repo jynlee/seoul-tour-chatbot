@@ -64,10 +64,10 @@
 ## 동작 흐름
 
 <p align="center">
-  <img src="docs/images/flow.png" alt="질문 → 종류 판정 → ① 장소 정보 질문 / ② 추천 코스 / ③ 일반 추천 → 답 문장·화면·대화 저장" width="100%">
+  <img src="docs/images/request-flow.png" alt="질문 → 종류 판정 → ① 장소 정보 질문 / ② 추천 코스 / ③ 일반 추천 → 답 문장·화면·대화 저장" width="100%">
 </p>
 
-<sub>그림 원본: `docs/images/flow.html` (브라우저로 열어 고친 뒤 캡처) · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
+<sub>그림 원본: `docs/images/request-flow.html` (브라우저로 열어 고친 뒤 캡처) · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
 
 - **검색은 "후보 고르기"만:** OpenSearch는 질문과 의미가 가까운 장소 id만 돌려주고, 장소 정보·거리·도보 시간은 앱이 데이터 파일(카탈로그)에서 계산합니다.
 - **반경 안에서 검색:** kNN에 거리 필터를 함께 걸어, 장소가 많은 동네에서도 가까운 곳이 빠지지 않습니다.
