@@ -1,6 +1,6 @@
 """Q2 Step 1: 실서비스 채팅 통합 테스트 (계획서 Q2 기준).
 
-실제 OpenSearch(seoul-tour-v3)·Ollama·MySQL(chat_message). `test-qa-` 세션만 쓰고 끝나면 지운다.
+실제 OpenSearch(seoul-tour)·Ollama·MySQL(chat_message). `test-qa-` 세션만 쓰고 끝나면 지운다.
 """
 import uuid
 

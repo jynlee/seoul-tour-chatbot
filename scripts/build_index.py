@@ -1,8 +1,8 @@
-"""seoul-tour-v3 인덱스를 (다시) 만든다.
+"""seoul-tour 인덱스를 (다시) 만든다.
 
     python scripts/build_index.py
 
-settings.opensearch_index 인덱스만 지우고 재생성한다. 다른 프로젝트 인덱스(seoul-tour·food-*)는 이름이 같으면 거부한다.
+settings.opensearch_index 인덱스만 지우고 재생성한다. 다른 프로젝트 인덱스(food-*)는 이름이 같으면 거부한다.
 좌표가 없는 장소도 색인은 한다(location 필드만 뺌).
 """
 import sys

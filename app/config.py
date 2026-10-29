@@ -17,7 +17,7 @@ class Settings:
     opensearch_port: int = 9200
     opensearch_user: str = ""
     opensearch_password: str = ""
-    opensearch_index: str = "seoul-tour-v3"
+    opensearch_index: str = "seoul-tour"
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "gemma4:e4b"
     embed_model: str = "jhgan/ko-sroberta-multitask"

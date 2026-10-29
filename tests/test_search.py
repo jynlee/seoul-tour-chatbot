@@ -24,10 +24,8 @@ def test_build_query_without_cat3_sorted_types():
 
 def test_index_name_guard():
     with pytest.raises(ValueError):
-        index_name_guard("seoul-tour")
-    with pytest.raises(ValueError):
         index_name_guard("")
-    assert index_name_guard("seoul-tour-v3") == "seoul-tour-v3"
+    assert index_name_guard("seoul-tour") == "seoul-tour"
 
 
 def test_document_text(small_catalog):
@@ -38,7 +36,7 @@ def test_document_text(small_catalog):
 
 
 def test_guard_protects_other_project_indexes():
-    for name in ("seoul-tour", "food-materials", "food-law-articles", "food-qa-cache", " food-materials "):
+    for name in ("food-materials", "food-law-articles", "food-qa-cache", " food-materials "):
         with pytest.raises(ValueError):
             index_name_guard(name)
 

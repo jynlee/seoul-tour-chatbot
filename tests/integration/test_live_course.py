@@ -1,6 +1,6 @@
-"""통합: 추천 코스 실데이터(seoul-tour-v3, 3,441곳) 확인 — 실제 OpenSearch·임베딩으로 코스가 쓸 만한지.
+"""통합: 추천 코스 실데이터(seoul-tour, 3,441곳) 확인 — 실제 OpenSearch·임베딩으로 코스가 쓸 만한지.
 
-실행: OPENSEARCH_INDEX=seoul-tour-v3 pytest -m integration tests/integration/test_live_course.py
+실행: pytest -m integration tests/integration/test_live_course.py
 LLM은 가짜(답 문구는 안 봄, 뺀 칸 안내는 핸들러가 앞에 붙인 문구로 확인). 대화 기록은 `test-qa-` 세션만 쓰고 끝나면 지운다.
 """
 import dataclasses

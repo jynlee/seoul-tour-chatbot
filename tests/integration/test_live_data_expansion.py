@@ -1,6 +1,6 @@
-"""QA 통합: 데이터 확장(seoul-tour-v3) 품질 메모 ①② 재현 — 실제 OpenSearch·임베딩 순위로만 드러나는 것.
+"""QA 통합: 데이터 확장(seoul-tour) 품질 메모 ①② 재현 — 실제 OpenSearch·임베딩 순위로만 드러나는 것.
 
-실행: OPENSEARCH_INDEX=seoul-tour-v3 pytest -m integration tests/integration/test_live_data_expansion.py
+실행: pytest -m integration tests/integration/test_live_data_expansion.py
 LLM은 가짜(답 문구는 안 봄). 대화 기록은 `test-qa-` 세션만 쓰고 끝나면 지운다.
 ②는 0c2f9d3, ①은 02fee94(반경 안 kNN + 가장 가까운 곳 포함)에서 고쳐져 xfail을 지움 — 이제 회귀 테스트.
 """
