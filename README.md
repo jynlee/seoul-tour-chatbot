@@ -76,7 +76,7 @@
 ## 시스템 구조
 
 <p align="center">
-  <img src="docs/images/architecture.png" alt="휴대폰 브라우저 ⇄ FastAPI 서버 → OpenSearch·Ollama·MySQL, 데이터 준비: 관광공사 OpenAPI → 수집 스크립트 → data/*.json → build_index" width="90%">
+  <img src="docs/images/system-architecture.png" alt="휴대폰 브라우저 ⇄ FastAPI 서버 → OpenSearch·Ollama·MySQL, 데이터 준비: 관광공사 OpenAPI → 수집 스크립트 → data/*.json → build_index" width="90%">
 </p>
 
 <sub>그림 원본: `docs/images/architecture.html` · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
@@ -133,13 +133,13 @@
 
 4. `.env.example`을 `.env`로 복사하고 OpenSearch·MySQL 계정을 넣습니다.
    - `TOUR_API_KEY`(관광공사 API 키)는 데이터를 새로 받을 때만 필요합니다. 저장소의 `data/`를 그대로 쓰면 비워 둬도 됩니다.
-   - 인덱스 이름 `OPENSEARCH_INDEX`는 `seoul-tour-v3`로 둡니다.
+   - 인덱스 이름 `OPENSEARCH_INDEX`는 `seoul-tour`로 둡니다.
 
 ## 검색 인덱스 만들기 (처음 한 번)
 
     python scripts/build_index.py
 
-`data/seoul_tour.json`과 `data/seoul_tour_enriched.json`으로 3,441곳을 임베딩해 `seoul-tour-v3` 인덱스에 넣습니다.
+`data/seoul_tour.json`과 `data/seoul_tour_enriched.json`으로 3,441곳을 임베딩해 `seoul-tour` 인덱스에 넣습니다.
 
 ### 데이터를 새로 받을 때
 

@@ -7,7 +7,7 @@ from typing import Protocol
 from app.catalog import Place
 
 # 같은 OpenSearch를 쓰는 다른 프로젝트 인덱스: 읽지도 쓰지도 않음
-PROTECTED_INDEXES = {"seoul-tour", "food-materials", "food-law-articles", "food-qa-cache"}
+PROTECTED_INDEXES = {"food-materials", "food-law-articles", "food-qa-cache"}
 VECTOR_DIM = 768
 # 임베딩 모델 최대 128토큰: 기존 문장이 약 32토큰이라 개요는 앞부분 150자(약 90토큰)만 붙인다
 OVERVIEW_CHARS = 150

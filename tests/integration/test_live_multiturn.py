@@ -1,4 +1,4 @@
-"""QA 통합: B8(place_info)·B9(멀티턴) — 실제 OpenSearch(seoul-tour-v3)·Ollama(gemma4:e4b)·MySQL(chat_message).
+"""QA 통합: B8(place_info)·B9(멀티턴) — 실제 OpenSearch(seoul-tour)·Ollama(gemma4:e4b)·MySQL(chat_message).
 
 실행: pytest -m integration -v  (worktree 루트에 .env 필요)
 대화 기록은 `test-qa-` 접두 세션만 쓰고 끝나면 지운다.
