@@ -6,7 +6,7 @@
 "종로 데이트 코스"라고 하면 **걸어서 이어지는 3~4곳 코스**를 짜 줍니다.
 
 <p align="center">
-  <img src="docs/images/app-screens.png" alt="① 첫 화면 → ② 코스 1번 핀을 누르면 뜨는 장소 카드 → ③ 추천 코스(번호 핀·점선) → ④ 거기 주차 가능해?·몇 시까지야? 이어 묻기" width="85%"><br>
+  <img src="docs/images/app-screens.png" alt="① 첫 화면 → ② 코스 1번 핀을 누르면 뜨는 장소 카드 → ③ 추천 코스(번호 핀·점선) → ④ 거기 주차 가능해?·몇 시까지야? 이어 묻기" width="95%"><br>
   <sub>① 첫 화면 · ② 남산순환나들길 핀을 누르면 뜨는 장소 카드 · ③ "종로 데이트코스 추천해줘" · ④ "거기 주차 가능해?" → "거기 몇 시까지야?" 이어 묻기</sub>
 </p>
 
@@ -64,7 +64,7 @@
 ## 동작 흐름
 
 <p align="center">
-  <img src="docs/images/request-flow.png" alt="질문 → 종류 판정 → ① 장소 정보 질문 / ② 추천 코스 / ③ 일반 추천 → 답 문장·화면·대화 저장" width="80%">
+  <img src="docs/images/request-flow.png" alt="질문 → 종류 판정 → ① 장소 정보 질문 / ② 추천 코스 / ③ 일반 추천 → 답 문장·화면·대화 저장" width="90%">
 </p>
 
 <sub>그림 원본: `docs/images/request-flow.html` (브라우저로 열어 고친 뒤 캡처) · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
@@ -76,7 +76,7 @@
 ## 시스템 구조
 
 <p align="center">
-  <img src="docs/images/architecture.png" alt="휴대폰 브라우저 ⇄ FastAPI 서버 → OpenSearch·Ollama·MySQL, 데이터 준비: 관광공사 OpenAPI → 수집 스크립트 → data/*.json → build_index" width="80%">
+  <img src="docs/images/architecture.png" alt="휴대폰 브라우저 ⇄ FastAPI 서버 → OpenSearch·Ollama·MySQL, 데이터 준비: 관광공사 OpenAPI → 수집 스크립트 → data/*.json → build_index" width="90%">
 </p>
 
 <sub>그림 원본: `docs/images/architecture.html` · 글꼴 [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License)</sub>
