@@ -65,13 +65,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .inp input {
   flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
-  font: inherit; font-size: 15px; color: var(--ink); padding: 5px 0;
+  /* 16px 미만이면 iPhone Safari가 입력창을 누를 때 화면을 확대하고 되돌리지 않음 */
+  font: inherit; font-size: 16px; color: var(--ink); padding: 5px 0;
 }
 .inp input::placeholder { color: var(--muted); }
 .inp .gps {
   margin-left: auto; border: 0; background: transparent; font-size: 18px;
   width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
 }
+/* 보내기: 분홍 동그라미, 글자가 없거나 답을 기다리는 중이면 흐리게 */
+.inp .send {
+  flex-shrink: 0; border: 0; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--pink); color: #fff; font-size: 15px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; padding: 0 0 0 2px;
+  box-shadow: 0 1px 0 var(--pink-line); transition: opacity .15s ease;
+}
+.inp .send:disabled { opacity: .35; cursor: default; box-shadow: none; }
+.inp .send:not(:disabled):active { transform: translateY(1px); }
 .inp .gps.on { background: #e9f1ff; box-shadow: 0 0 0 2px #4f8cff55; }
 
 /* ---------- 일러스트 지도 (시안 result-screen.html) ---------- */
