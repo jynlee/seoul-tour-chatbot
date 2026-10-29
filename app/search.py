@@ -6,8 +6,8 @@ from typing import Protocol
 
 from app.catalog import Place
 
-PROTECTED_INDEXES = {"seoul-tour", "food-materials"}  # 다른 프로젝트 인덱스: 읽지도 쓰지도 않음
-WRITE_PROTECTED_INDEXES = PROTECTED_INDEXES | {"seoul-tour-v2"}  # 574곳 확인 서버가 쓰는 인덱스: 다시 만들지 않음
+# 같은 OpenSearch를 쓰는 다른 프로젝트 인덱스: 읽지도 쓰지도 않음
+PROTECTED_INDEXES = {"seoul-tour", "food-materials", "food-law-articles", "food-qa-cache"}
 VECTOR_DIM = 768
 # 임베딩 모델 최대 128토큰: 기존 문장이 약 32토큰이라 개요는 앞부분 150자(약 90토큰)만 붙인다
 OVERVIEW_CHARS = 150
@@ -28,11 +28,9 @@ class Searcher(Protocol):
             near: tuple[float, float, float] | None = None) -> list[tuple[str, float]]: ...
 
 
-def index_name_guard(name: str, write: bool = False) -> str:
-    """write=True(인덱스 삭제·생성)면 seoul-tour-v2 도 거부."""
-    protected = WRITE_PROTECTED_INDEXES if write else PROTECTED_INDEXES
-    if not name or name.strip() in protected:
-        raise ValueError(f"이 인덱스 이름은 쓸 수 없어요: {name!r} (보호: {', '.join(sorted(protected))})")
+def index_name_guard(name: str) -> str:
+    if not name or name.strip() in PROTECTED_INDEXES:
+        raise ValueError(f"이 인덱스 이름은 쓸 수 없어요: {name!r} (보호: {', '.join(sorted(PROTECTED_INDEXES))})")
     return name
 
 
