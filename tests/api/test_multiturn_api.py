@@ -666,3 +666,53 @@ def test_history_clarify_and_no_more_saved_without_center(real_catalog):
     api.say("주차 가능해?")
     bot = api.history()[1]
     assert bot["center"] is None and bot["places"] == []
+
+
+# ---------------------------------------------------------------- 지시어 없는 설명 질문 (10/29 사용자 보고)
+
+@pytest.mark.parametrize("message", ["뭐하는곳인데?", "어떤 곳이야?", "자세히 알려줘"])
+def test_explain_without_demonstrative_points_to_first(real_catalog, message):
+    """'거기' 없이 "뭐하는곳인데?"만 물어도 새 추천이 아니라 직전 첫 장소 설명."""
+    api = Api(real_catalog, llm=FakeLLM(fail=True))
+    r1 = api.say("명동 맛집 추천해줘")
+    r = api.say(message)
+    assert_place_info(r)
+    p = real_catalog[r1["places"][0]["id"]]
+    assert r["answer"].startswith(f"{p.title}: ")
+
+
+def test_explain_without_demonstrative_uses_selected(real_catalog):
+    api = Api(real_catalog, llm=FakeLLM(fail=True))
+    r1 = api.say("명동 맛집 추천해줘")
+    second = r1["places"][1]["id"]
+    r = api.say("뭐하는 곳이야?", selected_place_id=second)
+    assert r["answer"].startswith(f"{real_catalog[second].title}: ")
+
+
+@pytest.mark.parametrize("message", ["종로 박물관은 어떤 곳이야?", "카페는 뭐하는 곳이 좋아?"])
+def test_explain_with_new_area_or_category_still_recommends(real_catalog, message):
+    api = Api(real_catalog)
+    api.say("명동 맛집 추천해줘")
+    r = api.say(message)
+    assert r["places"]
+
+
+def test_explain_answer_uses_overview(real_catalog):
+    """장소 소개 질문의 근거에 관광공사 개요가 들어간다 (LLM이 뭐하는 곳인지 말할 수 있게)."""
+    catalog = dict(real_catalog)
+    gm = catalog[next(p.id for p in catalog.values() if p.title == GAESEONG)]
+    catalog[gm.id] = dataclasses.replace(gm, overview="손으로 빚은 개성식 만두를 파는 인사동 만둣집이다. " + "가" * 600)
+    api = Api(catalog)
+    api.say("개성만두 궁 뭐하는 곳이야?")
+    prompt = api.llm.prompts[-1]
+    assert "소개: 손으로 빚은 개성식 만두를 파는 인사동 만둣집이다." in prompt
+    assert "가" * 400 not in prompt  # 너무 긴 개요는 잘라서 넣음
+
+
+def test_explain_template_uses_overview_first_sentence(real_catalog):
+    catalog = dict(real_catalog)
+    gm = catalog[next(p.id for p in catalog.values() if p.title == GAESEONG)]
+    catalog[gm.id] = dataclasses.replace(gm, overview="손으로 빚은 개성식 만두를 파는 만둣집이다. 1970년에 문을 열었다.")
+    api = Api(catalog, llm=FakeLLM(fail=True))
+    r = api.say("개성만두 궁 뭐하는 곳이야?")
+    assert r["answer"].endswith(" 손으로 빚은 개성식 만두를 파는 만둣집이다.")

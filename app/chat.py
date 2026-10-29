@@ -18,8 +18,8 @@ from typing import Any
 from app.center import Center, has_named_area, match_place, resolve_center
 from app.course import COURSE_WORDS, DATE_WORDS, build_course, plan_course
 from app.dialog import (
-    asked_fields, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
-    intent_from_places, is_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference, wants_whole_seoul,
+    asked_fields, demonstrative_reference, earlier_place_lists, focus_place_id, format_history, has_demonstrative, info_value,
+    intent_from_places, is_explain, is_implicit_explain, is_more_request, is_near, ordinal_out_of_range, resolve_reference, wants_whole_seoul,
 )
 from app.catalog import CAFE_CAT3, EVENT_TYPE, FOOD_TYPE
 from app.intent import CASUAL_RESPONSES, TOUR_TOPICS, TOUR_TYPES, detect_intent
@@ -81,6 +81,10 @@ class ChatService:
         more = is_more_request(msg)
         ref = resolve_reference(msg, req.selected_place_id, last_places, focus_id, catalog, near=near,
                                 earlier_lists=earlier_place_lists(messages))
+        # "뭐하는곳인데?"처럼 지시어 없이 설명만 물으면 '거기'와 같이 본다 (새 지역·종류를 말했으면 새 추천)
+        if (ref is None and not near and not more and is_implicit_explain(msg) and not intent.has_category
+                and not has_named_area(msg, catalog)):
+            ref = demonstrative_reference(req.selected_place_id, last_places, focus_id, catalog)
         fields = asked_fields(msg)
         history_texts = format_history(messages)
 

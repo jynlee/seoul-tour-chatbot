@@ -33,6 +33,11 @@ FIELD_LABELS = {
 # 지칭된 장소에 대해 설명을 묻는 말
 EXPLAIN_KEYWORDS = ("어디야", "어디에", "어디 있", "어디예요", "어디죠", "뭐야", "뭐예요", "뭐하는", "어떤 곳", "어떤곳",
                     "어때", "다시 알려", "다시 말해", "소개", "설명", "자세히")
+# 지시어 없이 설명만 묻는 짧은 말("뭐하는곳인데?"·"어떤 곳이야?") → 직전 장소를 가리킨 것으로 본다.
+# '어때'·'다시 알려'는 "강남은 어때?"처럼 새 질문에도 흔해서 뺌
+IMPLICIT_EXPLAIN_KEYWORDS = ("뭐하는", "어떤 곳", "어떤곳", "뭐야", "뭐예요", "소개", "설명", "자세히", "어디야", "어디에",
+                             "어디 있")
+IMPLICIT_EXPLAIN_MAX_LEN = 20
 # 이 말이 있으면 장소 정보 질문이 아니라 추천(기존 near 의도)
 NEAR_KEYWORDS = ("근처", "주변", "가까운", "가까이", "추천")
 # "다른 데 더 추천해줘" — 직전 지역·카테고리를 이어받고 이미 보여 준 곳은 뺀다
@@ -79,6 +84,10 @@ def is_more_request(message: str) -> bool:
 
 def is_explain(message: str) -> bool:
     return _has(message, EXPLAIN_KEYWORDS)
+
+
+def is_implicit_explain(message: str) -> bool:
+    return len(message.strip()) <= IMPLICIT_EXPLAIN_MAX_LEN and _has(message, IMPLICIT_EXPLAIN_KEYWORDS)
 
 
 def ordinal_index(message: str) -> int | None:
@@ -166,16 +175,23 @@ def resolve_reference(message: str, selected_place_id: str | None, last_places: 
             if ref is not None:
                 return ref
 
-    # 4) "거기/그곳/그 집": 선택한 장소 → 방금 설명한 장소 → 직전 추천의 첫 장소
+    # 4) "거기/그곳/그 집"
     if _has(message, REF_DEMONSTRATIVES):
-        if selected_place_id:
-            chosen = next((p for p in last_places if p.id == selected_place_id), None)
-            if chosen is not None:
-                return from_out(chosen, "demonstrative")
-        if focus_id and focus_id in catalog:
-            return Reference(catalog[focus_id], "demonstrative")
-        if last_places:
-            return from_out(last_places[0], "demonstrative")
+        return demonstrative_reference(selected_place_id, last_places, focus_id, catalog)
+    return None
+
+
+def demonstrative_reference(selected_place_id: str | None, last_places: list[PlaceOut], focus_id: str | None,
+                            catalog: dict[str, Place]) -> Reference | None:
+    """'거기'가 가리키는 곳: 선택한 장소 → 방금 설명한 장소 → 직전 추천의 첫 장소."""
+    if selected_place_id:
+        chosen = next((p for p in last_places if p.id == selected_place_id), None)
+        if chosen is not None and chosen.id in catalog:
+            return Reference(catalog[chosen.id], "demonstrative")
+    if focus_id and focus_id in catalog:
+        return Reference(catalog[focus_id], "demonstrative")
+    if last_places and last_places[0].id in catalog:
+        return Reference(catalog[last_places[0].id], "demonstrative")
     return None
 
 

@@ -150,3 +150,17 @@ test('접힘 바: 코스는 "{label} · 코스 N곳", 기준점 없으면 "추�
   assert.doesNotMatch(a, /근처/);
   assert.match(foldBarHtml(null, COURSE), /<b>추천 코스<\/b><span> · 3곳<\/span>/);
 });
+
+test('말풍선: 답에 나온 장소 이름을 굵게 (띄어쓰기 차이·대괄호·뒤 괄호·긴 이름 먼저)', () => {
+  const names = ['스탈릿성수', '성수연방', '[K드라마 촬영지] 공근혜갤러리', '서울무역전시컨벤션센터(SETEC)', "Tom's 카페"];
+  const html = bubbleHtml('assistant', '스탈릿 성수와 성수연방, 공근혜갤러리, 서울무역전시컨벤션센터가 있어요. Tom\'s 카페도요.', names);
+  assert.match(html, /<b>스탈릿 성수<\/b>와 <b>성수연방<\/b>, <b>공근혜갤러리<\/b>, <b>서울무역전시컨벤션센터<\/b>가/);
+  assert.match(html, /<b>Tom&#39;s 카페<\/b>도요/);
+  assert.doesNotMatch(html, /<b>성수<\/b>/);
+});
+
+test('말풍선: 이미 **굵게**인 곳은 겹쳐 감싸지 않고, 내 말풍선은 굵게 안 함', () => {
+  assert.match(bubbleHtml('assistant', '**성수연방** 추천', ['성수연방']), /^<div class="bub b"><b>성수연방<\/b> 추천<\/div>$/);
+  assert.doesNotMatch(bubbleHtml('user', '성수연방 뭐야', ['성수연방']), /<b>/);
+  assert.doesNotMatch(bubbleHtml('assistant', '안녕하세요', []), /<b>/);
+});
