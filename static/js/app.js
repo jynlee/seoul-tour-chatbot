@@ -196,6 +196,12 @@ async function send(message) {
 function setBusy(on) {
   state.busy = on;
   $('#newchat').disabled = on;
+  updateSend();
+}
+
+// 보내기 버튼: 글자가 있고 답을 기다리는 중이 아닐 때만 누를 수 있음
+function updateSend() {
+  $('#send').disabled = state.busy || !$('#msg').value.trim();
 }
 
 // ---------- 위치 (📍 버튼 / "📍 내 주변 맛집" 칩) ----------
@@ -290,6 +296,8 @@ $('#inp').addEventListener('submit', (e) => {
   const text = $('#msg').value;
   if (!text.trim() || state.busy) return;
   $('#msg').value = '';
+  updateSend();
   send(text);
 });
+$('#msg').addEventListener('input', updateSend);
 restore();
