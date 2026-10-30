@@ -1,6 +1,7 @@
 // 첫 화면 S2a "원형 배지 링" — 시안 first-screen-s2a.html 의 s2a() 를 그대로 옮김.
 // 글자 라벨·배·흰 곡선 없음. 한강에는 짧은 물빛 선만.
 // 섬 위 🍜 핀은 사용자 요청으로 뺐다(2026-10-23). 대신 포인터를 따라다니는 🎒 (follower.js).
+// 강 위 로고: 로고 시안 D(2026-10-30) — 상단 워드마크와 같은 Jua 두 색, 흰 테두리 글씨.
 import { defs, palace, gate, namsan, ddp, b63, lotte, tree, cloud, badge, BADGE_ART } from './landmarks.js';
 
 const RING_PTS = [[150, 62], [262, 128], [262, 262], [150, 330], [38, 262], [38, 128]];
@@ -29,6 +30,9 @@ export function homeSvg(s = 'home') {
     + '<path d="M58,196 C88,166 120,214 150,190 C180,166 212,212 242,186 L242,226 C212,250 180,206 150,230 C120,254 88,206 58,236Z" fill="url(#river' + s + ')"/>'
     + '<path d="M76,214 L92,212 M110,224 L122,223 M190,206 L206,204 M214,222 L226,221 M136,206 L146,205" stroke="#e8f6fd" stroke-width="2.4" stroke-linecap="round" opacity=".9"/>'
     + tree(118, 150, 8) + tree(136, 140, 10) + tree(158, 146, 8) + tree(184, 152, 7) + tree(124, 262, 7) + tree(170, 264, 8)
+    + '<text class="home-logo" x="150" y="218" font-family="Jua, sans-serif" font-size="30" text-anchor="middle"'
+    + ' stroke="#fff" stroke-width="6" stroke-linejoin="round" paint-order="stroke">'
+    + '<tspan fill="#ff6f8d">서울</tspan><tspan fill="#5a4632"> 여행친구</tspan></text>'
     + ring(s) + cloud(50, 385) + cloud(240, 395)
     + '</svg>';
 }

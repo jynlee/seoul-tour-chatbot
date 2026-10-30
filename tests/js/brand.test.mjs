@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pickBadge, badgeSvg, DEFAULT_BADGE } from '../../static/js/brand.js';
+import { homeSvg } from '../../static/js/home.js';
 
 // 좌표는 백엔드 app/geo.py 인기 지역 이름표·카탈로그 값
 test('가장 가까운 랜드마크 배지', () => {
@@ -27,4 +28,10 @@ test('배지 SVG는 40px, 글자 없음', () => {
   const svg = badgeSvg('b63');
   assert.match(svg, /width="40" height="40"/);
   assert.doesNotMatch(svg, /<text/);
+});
+
+test('첫 화면 원 안 로고: 상단 워드마크와 같은 Jua 두 색', () => {
+  const svg = homeSvg();
+  assert.match(svg, /<text class="home-logo"[^>]*font-family="Jua/);
+  assert.match(svg, /<tspan fill="#ff6f8d">서울<\/tspan><tspan fill="#5a4632"> 여행친구<\/tspan>/);
 });
