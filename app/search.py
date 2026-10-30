@@ -70,7 +70,7 @@ def build_query(vector: list[float], content_types: set[str], cat3: str | None, 
 
 
 INDEX_BODY = {
-    "settings": {"index": {"knn": True, "knn.algo_param.ef_search": 100}},
+    "settings": {"index": {"knn": True, "knn.algo_param.ef_search": 100, "number_of_replicas": 0}},
     "mappings": {
         "properties": {
             "id": {"type": "keyword"},
